@@ -1,19 +1,24 @@
 import { Outlet, NavLink } from "react-router-dom";
-import { ScanLine, ShieldCheck, BarChart3, UserCircle2, FlaskConical } from "lucide-react";
+import { ScanLine, ShieldCheck, BarChart3, UserCircle2, FlaskConical, LogOut } from "lucide-react";
 import { getCurrentOperator, getLastSAPRefresh } from "@/lib/app-context";
 import { formatDate } from "@/lib/time-utils";
 import { LGCLogo, BrandHexPattern } from "@/components/system/LGCLogo";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ensurePlant1200MaterialMasterSeeded } from "@/lib/material-master-autoseed";
+import { useAuth } from "@/components/system/AuthProvider";
+
 export default function Layout() {
   const queryClient = useQueryClient();
+  const { signOut } = useAuth();
   const operator = getCurrentOperator();
+
   useEffect(() => {
     ensurePlant1200MaterialMasterSeeded().then(() => {
       queryClient.invalidateQueries({ queryKey: ["materialCatalog"] });
     });
   }, [queryClient]);
+
   const lastRefresh = getLastSAPRefresh();
   const navItems = [
     { to: "/", label: "Operator", icon: ScanLine },
@@ -21,23 +26,13 @@ export default function Layout() {
     { to: "/reports", label: "Reports", icon: BarChart3 },
     { to: "/diagnostics", label: "Diagnostics", icon: FlaskConical },
   ];
+
   return (
     <div className="bg-background text-foreground flex flex-col min-h-svh">
-      {/*
-        Header uses the LGC D&G masterbrand lead colour (#096179) as the
-        dominant surface, per brand guidance that the lead colour "should be
-        the dominant colour in all brand applications". The reversed logo
-        lockup sits in the top-left corner per the brand's Lockup Dos.
-      */}
       <header className="border-b sticky top-0 z-40 bg-primary text-primary-foreground shadow-sm relative overflow-hidden">
-        {/* Decorative hexagon motif from the brand's visual language */}
         <BrandHexPattern className="absolute inset-y-0 right-0 h-full w-1/2 text-white" />
         <div className="relative mx-auto w-full max-w-7xl px-4 md:px-8 h-20 flex items-center gap-4">
           <div className="flex items-center gap-4">
-            {/*
-              Reversed masterbrand lockup. Height >= 33px per brand minimum
-              digital size (p.8).
-            */}
             <LGCLogo variant="reversed" className="h-11 md:h-12 w-auto" />
             <div className="hidden md:block h-10 w-px bg-primary-foreground/25" aria-hidden="true" />
             <div className="hidden md:flex flex-col leading-tight">
@@ -68,7 +63,7 @@ export default function Layout() {
               </NavLink>
             ))}
           </nav>
-          <div className="ml-auto flex items-center gap-4 text-xs md:text-sm">
+          <div className="ml-auto flex items-center gap-3 text-xs md:text-sm">
             <div className="hidden md:flex flex-col items-end leading-tight">
               <span className="opacity-80">Last SAP Refresh</span>
               <span className="font-medium">{formatDate(lastRefresh)}</span>
@@ -80,9 +75,18 @@ export default function Layout() {
                 <span className="font-semibold">{operator.name}</span>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              className="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-primary-foreground/85 transition-colors hover:bg-primary-foreground/10"
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden md:inline">Sign out</span>
+            </button>
           </div>
         </div>
-        {/* Mobile / tablet nav */}
         <div className="lg:hidden border-t border-primary-foreground/20 relative">
           <div className="mx-auto max-w-7xl px-2 flex">
             {navItems.map(({ to, label, icon: Icon }) => (
@@ -106,10 +110,6 @@ export default function Layout() {
       <main className="flex-1 w-full mx-auto max-w-7xl px-4 md:px-8 py-6">
         <Outlet />
       </main>
-      {/*
-        Footer uses masterbrand lead colour for a small brand endorsement bar,
-        per brand guidance to "underpin the brand" on secondary surfaces.
-      */}
       <footer className="border-t">
         <div className="mx-auto max-w-7xl px-4 md:px-8 py-3 flex flex-col md:flex-row items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">
