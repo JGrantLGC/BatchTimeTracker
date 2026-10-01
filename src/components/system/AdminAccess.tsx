@@ -140,6 +140,10 @@ function AdminLoginScreen({
       setError(mode === "signUp" ? "Enter your name, email, and password." : "Enter your email and password.");
       return;
     }
+    if (mode === "signUp" && password.length < 12) {
+      setError("Use a password with at least 12 characters that has not been used elsewhere.");
+      return;
+    }
     setBusy(true);
     try {
       const supabase = getSupabase();
@@ -152,8 +156,13 @@ function AdminLoginScreen({
       } else {
         onSignedIn(result.data.session);
       }
-    } catch {
-      setError(mode === "signUp" ? "Unable to create the administrator account." : "The email or password is incorrect.");
+    } catch (cause: unknown) {
+      const message = cause instanceof Error ? cause.message.toLowerCase() : "";
+      if (mode === "signUp" && (message.includes("weak") || message.includes("pwned") || message.includes("compromised"))) {
+        setError("Choose a stronger password that has not been used elsewhere.");
+      } else {
+        setError(mode === "signUp" ? "Unable to create the administrator account." : "The email or password is incorrect.");
+      }
     } finally {
       setBusy(false);
     }
@@ -182,6 +191,7 @@ function AdminLoginScreen({
         <label className="block space-y-1.5 text-sm font-medium" htmlFor="admin-password">
           Password
           <Input id="admin-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void submit(); }} autoComplete={mode === "signUp" ? "new-password" : "current-password"} />
+          {mode === "signUp" && <span className="block text-xs font-normal text-muted-foreground">Use at least 12 characters and avoid passwords used on other sites.</span>}
         </label>
         {error && <p role="alert" className="rounded-md bg-status-error/10 px-3 py-2 text-sm font-medium text-status-error">{error}</p>}
         <Button className="w-full" onClick={() => void submit()} disabled={busy}>{busy ? "Please wait…" : mode === "signUp" ? "Create administrator account" : "Sign in"}</Button>
