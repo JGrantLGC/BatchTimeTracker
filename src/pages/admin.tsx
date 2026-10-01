@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   UserPlus,
   UserMinus,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,6 +68,7 @@ import {
   useAdminAccess,
   type AdminUser,
 } from "@/components/system/AdminAccess";
+import { getSupabase } from "@/lib/supabase-client";
 export default function AdminPage() {
   const queryClient = useQueryClient();
   const { session, refreshAdminStatus } = useAdminAccess();
@@ -77,6 +79,9 @@ export default function AdminPage() {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [newAdminEmail, setNewAdminEmail] = useState("");
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
+  const [passwordBusy, setPasswordBusy] = useState(false);
   // Material Master snapshot
   const catalogQuery = useQuery({
     queryKey: ["materialCatalog"],
@@ -135,6 +140,30 @@ export default function AdminPage() {
       setAdminMessage("Administrator access granted.");
     } catch {
       setAdminMessage("That account could not be granted administrator access. Make sure it has signed up first.");
+    }
+  }
+  async function changePassword() {
+    setPasswordMessage(null);
+    if (
+      newPassword.length < 8 ||
+      !/[A-Za-z]/.test(newPassword) ||
+      !/[0-9]/.test(newPassword) ||
+      !/[^A-Za-z0-9]/.test(newPassword)
+    ) {
+      setPasswordMessage("Use at least 8 characters with a letter, a number, and a special character.");
+      return;
+    }
+    setPasswordBusy(true);
+    try {
+      const { error } = await getSupabase().auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setNewPassword("");
+      setPasswordMessage("Password updated successfully.");
+    } catch (cause: unknown) {
+      const message = cause instanceof Error ? cause.message : "";
+      setPasswordMessage(message || "Unable to change password. Please try again.");
+    } finally {
+      setPasswordBusy(false);
     }
   }
   async function removeAdministrator(userId: string) {
@@ -433,6 +462,35 @@ export default function AdminPage() {
               ))}
             </div>
             {adminMessage && <p role="status" className="text-sm text-muted-foreground">{adminMessage}</p>}
+          </div>
+          <div className="space-y-3 rounded-lg border p-4">
+            <div>
+              <h2 className="font-semibold">Change your password</h2>
+              <p className="text-sm text-muted-foreground">
+                Update the password for your administrator account ({session.user.email}).
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                placeholder="New password"
+                autoComplete="new-password"
+                aria-label="New password"
+                onKeyDown={(event) => { if (event.key === "Enter") void changePassword(); }}
+              />
+              <Button onClick={() => void changePassword()} disabled={passwordBusy || !newPassword}>
+                <KeyRound className="mr-1 h-4 w-4" />
+                {passwordBusy ? "Updating…" : "Change password"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Use at least 8 characters with a letter, a number, and a special character.
+            </p>
+            {passwordMessage && (
+              <p role="status" className="text-sm text-muted-foreground">{passwordMessage}</p>
+            )}
           </div>
           <div>
             <Button onClick={saveSettings}>
