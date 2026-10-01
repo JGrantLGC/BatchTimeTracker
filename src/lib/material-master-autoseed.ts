@@ -1,5 +1,6 @@
 import { getCatalogSnapshot } from "@/lib/material-catalog";
 import { importPlant1200MaterialMaster } from "@/lib/material-master-import";
+import { setLastSAPRefresh } from "@/lib/app-context";
 let inFlight: Promise<void> | null = null;
 export function ensurePlant1200MaterialMasterSeeded(): Promise<void> {
   if (inFlight) return inFlight;
@@ -10,6 +11,7 @@ export function ensurePlant1200MaterialMasterSeeded(): Promise<void> {
       await importPlant1200MaterialMaster({
         sourceLabel: "Plant 1200 (bundled, initial seed)",
       });
+      setLastSAPRefresh(new Date().toISOString());
     } catch {
       // Non-fatal
     }

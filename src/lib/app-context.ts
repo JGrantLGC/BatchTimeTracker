@@ -16,7 +16,7 @@ export function getCurrentOperator(): Operator {
 }
 export function setCurrentOperator(op: Operator) { memory.put(OPERATOR_KEY, op); }
 export function getLastSAPRefresh(): string {
-  return memory.ensure<string>(SAP_REFRESH_KEY, () => "2025-09-24T06:00:00.000Z");
+  return memory.ensure<string>(SAP_REFRESH_KEY, () => new Date().toISOString());
 }
 export function setLastSAPRefresh(value: string) { memory.put(SAP_REFRESH_KEY, value); }
 export function getAuthorizedUsers(): string[] {

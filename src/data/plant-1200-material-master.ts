@@ -16,7 +16,7 @@ export const PLANT_1200_MATERIAL_MASTER: PlantMaterialRow[] = [
     materialStatus: "Active",
     baseUOM: "EA",
     plant: "1200",
-    lastSAPRefresh: "2025-09-24T06:00:00.000Z",
+    lastSAPRefresh: "2026-10-01T06:00:00.000Z",
   },
   {
     materialNumber: "68-000019",
@@ -25,7 +25,7 @@ export const PLANT_1200_MATERIAL_MASTER: PlantMaterialRow[] = [
     materialStatus: "Active",
     baseUOM: "EA",
     plant: "1200",
-    lastSAPRefresh: "2025-09-24T06:00:00.000Z",
+    lastSAPRefresh: "2026-10-01T06:00:00.000Z",
   },
   {
     materialNumber: "72-100001",
@@ -34,7 +34,7 @@ export const PLANT_1200_MATERIAL_MASTER: PlantMaterialRow[] = [
     materialStatus: "Active",
     baseUOM: "EA",
     plant: "1200",
-    lastSAPRefresh: "2025-09-24T06:00:00.000Z",
+    lastSAPRefresh: "2026-10-01T06:00:00.000Z",
   },
   {
     materialNumber: "00045678",
@@ -43,7 +43,7 @@ export const PLANT_1200_MATERIAL_MASTER: PlantMaterialRow[] = [
     materialStatus: "Active",
     baseUOM: "KG",
     plant: "1200",
-    lastSAPRefresh: "2025-09-24T06:00:00.000Z",
+    lastSAPRefresh: "2026-10-01T06:00:00.000Z",
   },
   {
     materialNumber: "0100-0013",
@@ -52,7 +52,7 @@ export const PLANT_1200_MATERIAL_MASTER: PlantMaterialRow[] = [
     materialStatus: "Active",
     baseUOM: "EA",
     plant: "1200",
-    lastSAPRefresh: "2025-09-24T06:00:00.000Z",
+    lastSAPRefresh: "2026-10-01T06:00:00.000Z",
   },
   {
     materialNumber: "V-104AB",
@@ -61,6 +61,6 @@ export const PLANT_1200_MATERIAL_MASTER: PlantMaterialRow[] = [
     materialStatus: "Inactive",
     baseUOM: "ML",
     plant: "1200",
-    lastSAPRefresh: "2025-09-24T06:00:00.000Z",
+    lastSAPRefresh: "2026-10-01T06:00:00.000Z",
   },
 ];
