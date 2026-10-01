@@ -51,8 +51,14 @@ function OperatorLoginScreen({
   }
 
   return (
-    <main className="min-h-svh grid place-items-center bg-muted/30 p-6">
-      <section className="w-full max-w-md rounded-2xl border bg-card p-8 shadow-sm">
+    <main
+      className="min-h-svh grid place-items-center bg-[#0d6579] bg-cover bg-center bg-no-repeat p-6"
+      style={{
+        backgroundImage:
+          'url("/LGC_D%26G_Teams_Backgrounds_dark_teal_left_logo_orientation.png")',
+      }}
+    >
+      <section className="w-full max-w-md rounded-2xl border border-white/70 bg-white/95 p-8 shadow-2xl backdrop-blur-sm">
         <div className="mb-8 space-y-2">
           <p className="text-sm font-semibold uppercase tracking-widest text-primary">Cumberland Manufacturing</p>
           <h1 className="text-2xl font-bold tracking-tight">Operator sign-in</h1>
