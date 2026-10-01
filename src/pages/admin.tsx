@@ -121,6 +121,7 @@ export default function AdminPage() {
         .filter(Boolean),
     );
     setLastSAPRefresh(new Date(refresh).toISOString());
+    queryClient.invalidateQueries({ queryKey: ["sapRefresh"] });
     if (dataSource !== getDataSourceType()) {
       setDataSourceType(dataSource);
       loadCatalogFromStorage().then(() => {
@@ -195,8 +196,11 @@ export default function AdminPage() {
         onProgress: (p) => setImportProgress({ ...p }),
       });
       setImportResult(result);
-      setLastSAPRefresh(new Date().toISOString());
+      const now = new Date().toISOString();
+      setLastSAPRefresh(now);
+      setRefresh(now.substring(0, 10));
       queryClient.invalidateQueries({ queryKey: ["materialCatalog"] });
+      queryClient.invalidateQueries({ queryKey: ["sapRefresh"] });
     } finally {
       setImporting(false);
     }

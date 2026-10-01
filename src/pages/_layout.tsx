@@ -4,7 +4,7 @@ import { getCurrentOperator, getLastSAPRefresh } from "@/lib/app-context";
 import { formatDate } from "@/lib/time-utils";
 import { LGCLogo, BrandHexPattern } from "@/components/system/LGCLogo";
 import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ensurePlant1200MaterialMasterSeeded } from "@/lib/material-master-autoseed";
 import { useOperator } from "@/components/system/OperatorProvider";
 
@@ -19,7 +19,11 @@ export default function Layout() {
     });
   }, [queryClient]);
 
-  const lastRefresh = getLastSAPRefresh();
+  const sapRefreshQuery = useQuery({
+    queryKey: ["sapRefresh"],
+    queryFn: () => getLastSAPRefresh(),
+  });
+  const lastRefresh = sapRefreshQuery.data ?? getLastSAPRefresh();
   const navItems = [
     { to: "/", label: "Operator", icon: ScanLine },
     { to: "/admin", label: "Administration", icon: ShieldCheck },
