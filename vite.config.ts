@@ -10,6 +10,7 @@ export default defineConfig({
     tailwindcss(),
     powerApps(),
     ],
+ base: 'https://github.com/JGrantLGC/BatchTimeTracker/',
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src")
