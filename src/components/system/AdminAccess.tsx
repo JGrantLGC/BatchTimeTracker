@@ -159,13 +159,8 @@ function AdminLoginScreen({
       } else {
         onSignedIn(result.data.session);
       }
-    } catch (cause: unknown) {
-      const message = cause instanceof Error ? cause.message.toLowerCase() : "";
-      if (mode === "signUp" && (message.includes("weak") || message.includes("pwned") || message.includes("compromised"))) {
-        setError("Choose a stronger password that has not been used elsewhere.");
-      } else {
-        setError(mode === "signUp" ? "Unable to create the administrator account." : "The email or password is incorrect.");
-      }
+    } catch {
+      setError(mode === "signUp" ? "Unable to create the administrator account." : "The email or password is incorrect.");
     } finally {
       setBusy(false);
     }
