@@ -91,8 +91,24 @@ export default function OperatorPage() {
     },
     enabled: !!resolved,
   });
+  const operatorSessionsQuery = useQuery({
+    queryKey: ["operator-sessions", operator.email],
+    queryFn: async () => {
+      const list = await MaterialBatchSessionService.getAll();
+      return list
+        .filter(
+          (s) =>
+            s.OperatorEmail?.toLowerCase() === operator.email.toLowerCase(),
+        )
+        .sort(
+          (a, b) => new Date(b.StartTime).getTime() - new Date(a.StartTime).getTime(),
+        )
+        .slice(0, 10);
+    },
+  });
   const job = jobQuery.data ?? null;
   const sessions = sessionsQuery.data ?? [];
+  const operatorSessions = operatorSessionsQuery.data ?? [];
   // 1-second ticker used only when Running
   useEffect(() => {
     if (job?.JobStatus !== "Running") return;
@@ -243,6 +259,7 @@ export default function OperatorPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["job", resolved?.jobKey] });
       queryClient.invalidateQueries({ queryKey: ["sessions", resolved?.jobKey] });
+      queryClient.invalidateQueries({ queryKey: ["operator-sessions", operator.email] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["sessions-all"] });
       setFeedback({ kind: "success", message: "Timer started." });
@@ -293,6 +310,7 @@ export default function OperatorPage() {
     onSuccess: (dur) => {
       queryClient.invalidateQueries({ queryKey: ["job", resolved?.jobKey] });
       queryClient.invalidateQueries({ queryKey: ["sessions", resolved?.jobKey] });
+      queryClient.invalidateQueries({ queryKey: ["operator-sessions", operator.email] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["sessions-all"] });
       setFeedback({
@@ -354,6 +372,7 @@ export default function OperatorPage() {
     onSuccess: ({ finalTotal }) => {
       queryClient.invalidateQueries({ queryKey: ["job", resolved?.jobKey] });
       queryClient.invalidateQueries({ queryKey: ["sessions", resolved?.jobKey] });
+      queryClient.invalidateQueries({ queryKey: ["operator-sessions", operator.email] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["sessions-all"] });
       if (resolved) {
@@ -635,18 +654,16 @@ export default function OperatorPage() {
         >
           <span className="inline-flex items-center gap-2">
             <History className="h-4 w-4" />
-            Session History {resolved ? `for ${resolved.jobKey}` : ""}
+            My Recent Sessions
           </span>
           {historyOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </button>
         {historyOpen && (
           <div className="border-t px-3 py-2 max-h-60 overflow-auto">
-            {!resolved ? (
+            {operatorSessions.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Scan or enter a barcode to see session history.
+                No sessions yet. Start a timer to begin recording history.
               </p>
-            ) : sessions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No sessions yet for this JobKey.</p>
             ) : (
               <table className="w-full text-xs md:text-sm">
                 <thead className="text-muted-foreground">
@@ -655,11 +672,11 @@ export default function OperatorPage() {
                     <th className="text-left py-1 pr-2">Stop</th>
                     <th className="text-left py-1 pr-2">Duration</th>
                     <th className="text-left py-1 pr-2">Status</th>
-                    <th className="text-left py-1">Operator</th>
+                    <th className="text-left py-1">JobKey</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sessions.map((s: MaterialBatchSession) => (
+                  {operatorSessions.map((s: MaterialBatchSession) => (
                     <tr key={s.ID} className="border-t">
                       <td className="py-1.5 pr-2 whitespace-nowrap">{formatDateTime(s.StartTime)}</td>
                       <td className="py-1.5 pr-2 whitespace-nowrap">
@@ -675,7 +692,7 @@ export default function OperatorPage() {
                           : formatHMS(s.DurationSeconds ?? 0)}
                       </td>
                       <td className="py-1.5 pr-2">{s.SessionStatus}</td>
-                      <td className="py-1.5">{s.OperatorName ?? s.OperatorEmail ?? "—"}</td>
+                      <td className="py-1.5 font-mono text-xs">{s.JobKey}</td>
                     </tr>
                   ))}
                 </tbody>
