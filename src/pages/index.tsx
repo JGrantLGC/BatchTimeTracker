@@ -92,13 +92,13 @@ export default function OperatorPage() {
     enabled: !!resolved,
   });
   const operatorSessionsQuery = useQuery({
-    queryKey: ["operator-sessions", operator.email],
+    queryKey: ["operator-sessions", operator.name],
     queryFn: async () => {
       const list = await MaterialBatchSessionService.getAll();
       return list
         .filter(
           (s) =>
-            s.OperatorEmail?.toLowerCase() === operator.email.toLowerCase(),
+            s.OperatorName?.toLowerCase() === operator.name.toLowerCase(),
         )
         .sort(
           (a, b) => new Date(b.StartTime).getTime() - new Date(a.StartTime).getTime(),
@@ -259,7 +259,7 @@ export default function OperatorPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["job", resolved?.jobKey] });
       queryClient.invalidateQueries({ queryKey: ["sessions", resolved?.jobKey] });
-      queryClient.invalidateQueries({ queryKey: ["operator-sessions", operator.email] });
+      queryClient.invalidateQueries({ queryKey: ["operator-sessions", operator.name] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["sessions-all"] });
       setFeedback({ kind: "success", message: "Timer started." });
@@ -310,7 +310,7 @@ export default function OperatorPage() {
     onSuccess: (dur) => {
       queryClient.invalidateQueries({ queryKey: ["job", resolved?.jobKey] });
       queryClient.invalidateQueries({ queryKey: ["sessions", resolved?.jobKey] });
-      queryClient.invalidateQueries({ queryKey: ["operator-sessions", operator.email] });
+      queryClient.invalidateQueries({ queryKey: ["operator-sessions", operator.name] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["sessions-all"] });
       setFeedback({
@@ -372,7 +372,7 @@ export default function OperatorPage() {
     onSuccess: ({ finalTotal }) => {
       queryClient.invalidateQueries({ queryKey: ["job", resolved?.jobKey] });
       queryClient.invalidateQueries({ queryKey: ["sessions", resolved?.jobKey] });
-      queryClient.invalidateQueries({ queryKey: ["operator-sessions", operator.email] });
+      queryClient.invalidateQueries({ queryKey: ["operator-sessions", operator.name] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["sessions-all"] });
       if (resolved) {
