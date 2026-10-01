@@ -6,8 +6,13 @@
  *   - Import is a single atomic replace
  *   - Lookups are O(1) via a Map
  *   - No per-row throttling and no list-view-threshold risk
+ *
+ * Persistence is handled through the data-source layer: the snapshot
+ * is stored in either browser localStorage or Supabase depending on the
+ * admin-selected data source.
  */
  import type { PlantMaterialRow } from "@/data/plant-1200-material-master";
+ import { getBackend } from "@/lib/data-source";
  import { memory } from "@/lib/memory-store";
  export interface MaterialCatalogEntry {
    materialNumber: string;
@@ -45,7 +50,7 @@
  export function getAllCatalogEntries(): MaterialCatalogEntry[] {
    const snap = getCatalogSnapshot();
    return snap ? snap.entries.slice() : [];
- }
+   }
  export function replaceCatalog(
    entries: MaterialCatalogEntry[],
    sourceLabel: string,
@@ -60,6 +65,35 @@
    memory.put(CATALOG_KEY, snapshot);
    memory.put(INDEX_KEY, buildIndex(snapshot.entries));
    return snapshot;
+ }
+ /**
+  * Load the catalog snapshot from the active data source (localStorage or
+  * Supabase) into the in-memory cache. Called at app startup.
+  */
+ export async function loadCatalogFromStorage(): Promise<void> {
+   const snap = await getBackend().getCatalogSnapshot();
+   if (!snap) return;
+   const snapshot: MaterialCatalogSnapshot = {
+     revision: snap.revision,
+     importedAt: snap.importedAt,
+     sourceLabel: snap.sourceLabel,
+     entries: snap.entries.map(normalizeEntry),
+   };
+   memory.put(CATALOG_KEY, snapshot);
+   memory.put(INDEX_KEY, buildIndex(snapshot.entries));
+ }
+ /**
+  * Persist the current in-memory catalog snapshot to the active data source.
+  */
+ export async function persistCatalogToStorage(): Promise<void> {
+   const snap = getCatalogSnapshot();
+   if (!snap) return;
+   await getBackend().replaceCatalogSnapshot({
+     revision: snap.revision,
+     importedAt: snap.importedAt,
+     sourceLabel: snap.sourceLabel,
+     entries: snap.entries,
+   });
  }
  export function rowsToCatalogEntries(
    rows: PlantMaterialRow[],
@@ -86,4 +120,3 @@
    for (const e of entries) idx.set(e.materialNumber, e);
    return idx;
  }
- 

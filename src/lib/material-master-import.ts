@@ -1,12 +1,14 @@
 /**
  * Fast-path importer — single atomic snapshot write.
  * Diff counters are computed for progress reporting but the actual
- * "write" is a single replaceCatalog call.
+ * "write" is a single replaceCatalog call, followed by persistence
+ * to the admin-selected data source.
  */
  import {
   getCatalogSnapshot,
   replaceCatalog,
   rowsToCatalogEntries,
+  persistCatalogToStorage,
   type MaterialCatalogEntry,
 } from "@/lib/material-catalog";
 import {
@@ -72,6 +74,7 @@ export async function importPlant1200MaterialMaster(
     if (!nextKeys.has(prev.materialNumber)) progress.deleted++;
   }
   const snapshot = replaceCatalog(nextEntries, sourceLabel);
+  await persistCatalogToStorage();
   onProgress?.({ ...progress });
   const endedAt =
     typeof performance !== "undefined" ? performance.now() : Date.now();

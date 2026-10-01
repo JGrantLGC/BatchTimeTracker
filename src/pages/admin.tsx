@@ -34,6 +34,12 @@ import {
   setBarcodeDelimiter,
   setLastSAPRefresh,
 } from "@/lib/app-context";
+import {
+  getDataSourceType,
+  setDataSourceType,
+  type DataSourceType,
+} from "@/lib/data-source";
+import { loadCatalogFromStorage } from "@/lib/material-catalog";
 import { formatDate, formatDateTime, formatHMS } from "@/lib/time-utils";
 import { MaterialBatchJobService } from "@/api/services/MaterialBatchJobService";
 import { MaterialBatchSessionService } from "@/api/services/MaterialBatchSessionService";
@@ -59,6 +65,7 @@ export default function AdminPage() {
   const [delimiter, setDelim] = useState(getBarcodeDelimiter());
   const [authorized, setAuthorized] = useState(getAuthorizedUsers().join(", "));
   const [refresh, setRefresh] = useState(getLastSAPRefresh().substring(0, 10));
+  const [dataSource, setDataSource] = useState<DataSourceType>(getDataSourceType());
   // Material Master snapshot
   const catalogQuery = useQuery({
     queryKey: ["materialCatalog"],
@@ -114,6 +121,14 @@ export default function AdminPage() {
         .filter(Boolean),
     );
     setLastSAPRefresh(new Date(refresh).toISOString());
+    if (dataSource !== getDataSourceType()) {
+      setDataSourceType(dataSource);
+      loadCatalogFromStorage().then(() => {
+        queryClient.invalidateQueries({ queryKey: ["materialCatalog"] });
+        queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        queryClient.invalidateQueries({ queryKey: ["sessions-all"] });
+      });
+    }
   }
   function exportCSV(name: string, rows: object[]) {
     if (rows.length === 0) return;
@@ -304,6 +319,22 @@ export default function AdminPage() {
         </TabsContent>
         {/* SETTINGS */}
         <TabsContent value="settings" className="space-y-4 max-w-2xl">
+          <div className="space-y-2">
+            <Label htmlFor="datasource">Data Source Location</Label>
+            <select
+              id="datasource"
+              className="border rounded-md h-10 px-2 w-full bg-transparent"
+              value={dataSource}
+              onChange={(e) => setDataSource(e.target.value as DataSourceType)}
+            >
+              <option value="local">Browser (Local) — survives refreshes on this device</option>
+              <option value="supabase">Cloud Database (Supabase) — shared across all devices</option>
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Choose where job, session, and material catalog data is stored. Cloud Database
+              persists across devices and browsers. Browser stores data locally on this device only.
+            </p>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="delim">Barcode Delimiter</Label>
             <Input
