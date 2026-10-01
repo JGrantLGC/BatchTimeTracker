@@ -149,18 +149,33 @@ function AdminLoginScreen({
     }
     setBusy(true);
     try {
-      const supabase = getSupabase();
-      const result = mode === "signUp"
-        ? await supabase.auth.signUp({ email: trimmedEmail, password, options: { data: { display_name: name.trim() } } })
-        : await supabase.auth.signInWithPassword({ email: trimmedEmail, password });
-      if (result.error) throw result.error;
-      if (!result.data.session) {
-        setError("Account created. Check your email before signing in.");
+      if (mode === "signUp") {
+        const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-signup`;
+        const response = await fetch(apiUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ email: trimmedEmail, password, display_name: name.trim() }),
+        });
+        const body = await response.json();
+        if (!response.ok) {
+          throw new Error(body.error ?? "Unable to create the administrator account.");
+        }
+        const supabase = getSupabase();
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password });
+        if (signInError) throw signInError;
+        onSignedIn(signInData.session);
       } else {
+        const supabase = getSupabase();
+        const result = await supabase.auth.signInWithPassword({ email: trimmedEmail, password });
+        if (result.error) throw result.error;
         onSignedIn(result.data.session);
       }
-    } catch {
-      setError(mode === "signUp" ? "Unable to create the administrator account." : "The email or password is incorrect.");
+    } catch (cause: unknown) {
+      const message = cause instanceof Error ? cause.message : "";
+      setError(message || (mode === "signUp" ? "Unable to create the administrator account." : "The email or password is incorrect."));
     } finally {
       setBusy(false);
     }
