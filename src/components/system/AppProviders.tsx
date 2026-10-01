@@ -1,17 +1,17 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { loadCatalogFromStorage } from "@/lib/material-catalog";
-import { AuthProvider, useAuth } from "@/components/system/AuthProvider";
+import { OperatorProvider, useOperator } from "@/components/system/OperatorProvider";
 
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
-    <AuthProvider>
-      <AuthenticatedApp>{children}</AuthenticatedApp>
-    </AuthProvider>
+    <OperatorProvider>
+      <ReadyApp>{children}</ReadyApp>
+    </OperatorProvider>
   );
 }
 
-function AuthenticatedApp({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+function ReadyApp({ children }: { children: ReactNode }) {
+  const { operator } = useOperator();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -25,7 +25,7 @@ function AuthenticatedApp({ children }: { children: ReactNode }) {
       if (!cancelled) setReady(true);
     })();
     return () => { cancelled = true; };
-  }, [user.id]);
+  }, [operator.email]);
 
   if (!ready) {
     return <div className="min-h-svh grid place-items-center p-6 text-sm text-muted-foreground">Loading…</div>;

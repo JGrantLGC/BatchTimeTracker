@@ -1,17 +1,17 @@
 import { Outlet, NavLink } from "react-router-dom";
-import { ScanLine, ShieldCheck, BarChart3, UserCircle2, FlaskConical, LogOut } from "lucide-react";
+import { ScanLine, ShieldCheck, BarChart3, UserCircle2, FlaskConical, RefreshCw } from "lucide-react";
 import { getCurrentOperator, getLastSAPRefresh } from "@/lib/app-context";
 import { formatDate } from "@/lib/time-utils";
 import { LGCLogo, BrandHexPattern } from "@/components/system/LGCLogo";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ensurePlant1200MaterialMasterSeeded } from "@/lib/material-master-autoseed";
-import { useAuth } from "@/components/system/AuthProvider";
+import { useOperator } from "@/components/system/OperatorProvider";
 
 export default function Layout() {
   const queryClient = useQueryClient();
-  const { signOut } = useAuth();
-  const operator = getCurrentOperator();
+  const { changeOperator } = useOperator();
+  const currentOperator = getCurrentOperator();
 
   useEffect(() => {
     ensurePlant1200MaterialMasterSeeded().then(() => {
@@ -72,18 +72,18 @@ export default function Layout() {
               <UserCircle2 className="h-5 w-5" />
               <div className="flex flex-col leading-tight">
                 <span className="text-[11px] opacity-80">Operator</span>
-                <span className="font-semibold">{operator.name}</span>
+                <span className="font-semibold">{currentOperator.name}</span>
               </div>
             </div>
             <button
               type="button"
-              onClick={() => void signOut()}
+              onClick={changeOperator}
               className="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-primary-foreground/85 transition-colors hover:bg-primary-foreground/10"
-              aria-label="Sign out"
-              title="Sign out"
+              aria-label="Change operator"
+              title="Change operator"
             >
-              <LogOut className="h-4 w-4" />
-              <span className="hidden md:inline">Sign out</span>
+              <RefreshCw className="h-4 w-4" />
+              <span className="hidden md:inline">Change</span>
             </button>
           </div>
         </div>
