@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Download,
@@ -12,6 +12,8 @@ import {
   FileSpreadsheet,
   Loader2,
   CheckCircle2,
+  UserPlus,
+  UserMinus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,12 +60,23 @@ import {
   getCatalogSnapshot,
   type MaterialCatalogEntry,
 } from "@/lib/material-catalog";
+import {
+  grantAdminByEmail,
+  listAdminUsers,
+  revokeAdmin,
+  useAdminAccess,
+  type AdminUser,
+} from "@/components/system/AdminAccess";
 export default function AdminPage() {
   const queryClient = useQueryClient();
+  const { session, refreshAdminStatus } = useAdminAccess();
   const [search, setSearch] = useState("");
   const [delimiter, setDelim] = useState(getBarcodeDelimiter());
   const [authorized, setAuthorized] = useState(getAuthorizedUsers().join(", "));
   const [dataSource, setDataSource] = useState<DataSourceType>(getDataSourceType());
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [newAdminEmail, setNewAdminEmail] = useState("");
+  const [adminMessage, setAdminMessage] = useState<string | null>(null);
   // Material Master snapshot
   const catalogQuery = useQuery({
     queryKey: ["materialCatalog"],
@@ -110,6 +123,31 @@ export default function AdminPage() {
   const orphanSessions = sessions.filter(
     (s) => !s.StopTime && s.SessionStatus !== "Running",
   );
+  useEffect(() => {
+    listAdminUsers().then(setAdminUsers).catch(() => setAdminMessage("Unable to load administrator accounts."));
+  }, []);
+  async function addAdministrator() {
+    setAdminMessage(null);
+    try {
+      await grantAdminByEmail(newAdminEmail);
+      setNewAdminEmail("");
+      setAdminUsers(await listAdminUsers());
+      setAdminMessage("Administrator access granted.");
+    } catch {
+      setAdminMessage("That account could not be granted administrator access. Make sure it has signed up first.");
+    }
+  }
+  async function removeAdministrator(userId: string) {
+    setAdminMessage(null);
+    try {
+      await revokeAdmin(userId);
+      setAdminUsers(await listAdminUsers());
+      await refreshAdminStatus();
+      setAdminMessage("Administrator access removed.");
+    } catch {
+      setAdminMessage("You cannot remove your own administrator access.");
+    }
+  }
   function saveSettings() {
     setBarcodeDelimiter(delimiter || "|");
     setAuthorizedUsers(
@@ -357,6 +395,44 @@ export default function AdminPage() {
             <p className="text-xs text-muted-foreground">
               Comma-separated. Authorized users can Stop or End another operator's Running job.
             </p>
+          </div>
+          <div className="space-y-3 rounded-lg border p-4">
+            <div>
+              <h2 className="font-semibold">Administrator access</h2>
+              <p className="text-sm text-muted-foreground">
+                Add accounts that have already signed up, or remove access from someone who no longer needs it.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                type="email"
+                value={newAdminEmail}
+                onChange={(event) => setNewAdminEmail(event.target.value)}
+                placeholder="administrator@example.com"
+                aria-label="New administrator email"
+              />
+              <Button onClick={() => void addAdministrator()} disabled={!newAdminEmail.trim()}>
+                <UserPlus className="mr-1 h-4 w-4" />
+                Grant access
+              </Button>
+            </div>
+            <div className="divide-y rounded-md border">
+              {adminUsers.map((admin) => (
+                <div key={admin.user_id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{admin.display_name}</div>
+                    <div className="truncate text-xs text-muted-foreground">{admin.email}</div>
+                  </div>
+                  {admin.user_id !== session.user.id && (
+                    <Button variant="outline" size="sm" onClick={() => void removeAdministrator(admin.user_id)}>
+                      <UserMinus className="mr-1 h-4 w-4" />
+                      Remove
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {adminMessage && <p role="status" className="text-sm text-muted-foreground">{adminMessage}</p>}
           </div>
           <div>
             <Button onClick={saveSettings}>
