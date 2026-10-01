@@ -140,8 +140,11 @@ function AdminLoginScreen({
       setError(mode === "signUp" ? "Enter your name, email, and password." : "Enter your email and password.");
       return;
     }
-    if (mode === "signUp" && password.length < 12) {
-      setError("Use a password with at least 12 characters that has not been used elsewhere.");
+    if (
+      mode === "signUp" &&
+      (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password))
+    ) {
+      setError("Use at least 8 characters with a letter, a number, and a special character.");
       return;
     }
     setBusy(true);
@@ -191,7 +194,7 @@ function AdminLoginScreen({
         <label className="block space-y-1.5 text-sm font-medium" htmlFor="admin-password">
           Password
           <Input id="admin-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void submit(); }} autoComplete={mode === "signUp" ? "new-password" : "current-password"} />
-          {mode === "signUp" && <span className="block text-xs font-normal text-muted-foreground">Use at least 12 characters and avoid passwords used on other sites.</span>}
+          {mode === "signUp" && <span className="block text-xs font-normal text-muted-foreground">Use at least 8 characters with a letter, a number, and a special character.</span>}
         </label>
         {error && <p role="alert" className="rounded-md bg-status-error/10 px-3 py-2 text-sm font-medium text-status-error">{error}</p>}
         <Button className="w-full" onClick={() => void submit()} disabled={busy}>{busy ? "Please wait…" : mode === "signUp" ? "Create administrator account" : "Sign in"}</Button>
