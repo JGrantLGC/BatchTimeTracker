@@ -29,7 +29,6 @@ import {
 import {
   getAuthorizedUsers,
   getBarcodeDelimiter,
-  getLastSAPRefresh,
   setAuthorizedUsers,
   setBarcodeDelimiter,
   setLastSAPRefresh,
@@ -64,7 +63,6 @@ export default function AdminPage() {
   const [search, setSearch] = useState("");
   const [delimiter, setDelim] = useState(getBarcodeDelimiter());
   const [authorized, setAuthorized] = useState(getAuthorizedUsers().join(", "));
-  const [refresh, setRefresh] = useState(getLastSAPRefresh().substring(0, 10));
   const [dataSource, setDataSource] = useState<DataSourceType>(getDataSourceType());
   // Material Master snapshot
   const catalogQuery = useQuery({
@@ -120,8 +118,6 @@ export default function AdminPage() {
         .map((s) => s.trim())
         .filter(Boolean),
     );
-    setLastSAPRefresh(new Date(refresh).toISOString());
-    queryClient.invalidateQueries({ queryKey: ["sapRefresh"] });
     if (dataSource !== getDataSourceType()) {
       setDataSourceType(dataSource);
       loadCatalogFromStorage().then(() => {
@@ -196,9 +192,7 @@ export default function AdminPage() {
         onProgress: (p) => setImportProgress({ ...p }),
       });
       setImportResult(result);
-      const now = new Date().toISOString();
-      setLastSAPRefresh(now);
-      setRefresh(now.substring(0, 10));
+      setLastSAPRefresh(new Date().toISOString());
       queryClient.invalidateQueries({ queryKey: ["materialCatalog"] });
       queryClient.invalidateQueries({ queryKey: ["sapRefresh"] });
     } finally {
@@ -363,15 +357,6 @@ export default function AdminPage() {
             <p className="text-xs text-muted-foreground">
               Comma-separated. Authorized users can Stop or End another operator's Running job.
             </p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="refresh">Last SAP MaterialMaster Refresh</Label>
-            <Input
-              id="refresh"
-              type="date"
-              value={refresh}
-              onChange={(e) => setRefresh(e.target.value)}
-            />
           </div>
           <div>
             <Button onClick={saveSettings}>
