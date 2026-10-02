@@ -201,12 +201,13 @@ export default function AdminPage() {
     if (customDbUrl.trim() && customDbKey.trim()) {
       setCustomDbConfig(customDbUrl, customDbKey);
     }
-    if (dataSource !== getDataSourceType()) {
-      if (dataSource === "custom" && (!customDbUrl.trim() || !customDbKey.trim())) {
-        setDataSourceType("local");
-      } else {
-        setDataSourceType(dataSource);
-      }
+    const previousDataSource = getDataSourceType();
+    const savedDataSource =
+      dataSource === "custom" && (!customDbUrl.trim() || !customDbKey.trim())
+        ? "local"
+        : dataSource;
+    setDataSourceType(savedDataSource);
+    if (savedDataSource !== previousDataSource) {
       loadCatalogFromStorage().then(() => {
         queryClient.invalidateQueries({ queryKey: ["materialCatalog"] });
         queryClient.invalidateQueries({ queryKey: ["jobs"] });
