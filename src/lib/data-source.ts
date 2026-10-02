@@ -1,4 +1,4 @@
-import { getSupabase } from "@/lib/supabase-client";
+import { getSupabase, isSupabaseConfigured } from "@/lib/supabase-client";
 
 export type DataSourceType = "local" | "supabase";
 
@@ -6,7 +6,8 @@ const DS_KEY = "lgc:dataSource";
 
 export function getDataSourceType(): DataSourceType {
   const stored = localStorage.getItem(DS_KEY);
-  return stored === "supabase" ? "supabase" : "local";
+  if (stored === "supabase" && isSupabaseConfigured()) return "supabase";
+  return "local";
 }
 
 export function setDataSourceType(type: DataSourceType): void {

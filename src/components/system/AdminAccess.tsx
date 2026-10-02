@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { ShieldCheck } from "lucide-react";
-import { getSupabase } from "@/lib/supabase-client";
+import { getSupabase, isSupabaseConfigured } from "@/lib/supabase-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -13,7 +13,7 @@ export interface AdminUser {
 }
 
 interface AdminAccessContextValue {
-  session: Session;
+  session: Session | null;
   refreshAdminStatus: () => Promise<void>;
 }
 
@@ -45,6 +45,11 @@ export function AdminGate({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setLoading(false);
+      setIsAdmin(true);
+      return;
+    }
     let active = true;
     const supabase = getSupabase();
     supabase.auth.getSession().then(async ({ data: sessionData }) => {
@@ -79,6 +84,13 @@ export function AdminGate({ children }: { children: ReactNode }) {
 
   if (loading) {
     return <div className="grid min-h-[50vh] place-items-center text-sm text-muted-foreground">Checking administrator access…</div>;
+  }
+  if (!isSupabaseConfigured()) {
+    const localValue: AdminAccessContextValue = {
+      session: null,
+      refreshAdminStatus: async () => {},
+    };
+    return <AdminAccessContext.Provider value={localValue}>{children}</AdminAccessContext.Provider>;
   }
   if (!session) {
     return <AdminLoginScreen setupAvailable={setupAvailable} onSignedIn={setSession} />;

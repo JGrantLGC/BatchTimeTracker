@@ -68,7 +68,7 @@ import {
   useAdminAccess,
   type AdminUser,
 } from "@/components/system/AdminAccess";
-import { getSupabase } from "@/lib/supabase-client";
+import { isSupabaseConfigured, getSupabase } from "@/lib/supabase-client";
 export default function AdminPage() {
   const queryClient = useQueryClient();
   const { session, refreshAdminStatus } = useAdminAccess();
@@ -128,9 +128,11 @@ export default function AdminPage() {
   const orphanSessions = sessions.filter(
     (s) => !s.StopTime && s.SessionStatus !== "Running",
   );
+  const supabaseReady = isSupabaseConfigured();
   useEffect(() => {
+    if (!supabaseReady) return;
     listAdminUsers().then(setAdminUsers).catch(() => setAdminMessage("Unable to load administrator accounts."));
-  }, []);
+  }, [supabaseReady]);
   async function addAdministrator() {
     setAdminMessage(null);
     try {
@@ -393,11 +395,12 @@ export default function AdminPage() {
               onChange={(e) => setDataSource(e.target.value as DataSourceType)}
             >
               <option value="local">Browser (Local) — survives refreshes on this device</option>
-              <option value="supabase">Cloud Database (Supabase) — shared across all devices</option>
+              {supabaseReady && <option value="supabase">Cloud Database (Supabase) — shared across all devices</option>}
             </select>
             <p className="text-xs text-muted-foreground">
               Choose where job, session, and material catalog data is stored. Cloud Database
               persists across devices and browsers. Browser stores data locally on this device only.
+              {!supabaseReady && " Cloud Database is not available — no database is configured for this deployment."}
             </p>
           </div>
           <div className="space-y-2">
@@ -425,6 +428,7 @@ export default function AdminPage() {
               Comma-separated. Authorized users can Stop or End another operator's Running job.
             </p>
           </div>
+          {supabaseReady && (
           <div className="space-y-3 rounded-lg border p-4">
             <div>
               <h2 className="font-semibold">Administrator access</h2>
@@ -452,7 +456,7 @@ export default function AdminPage() {
                     <div className="truncate font-medium">{admin.display_name}</div>
                     <div className="truncate text-xs text-muted-foreground">{admin.email}</div>
                   </div>
-                  {admin.user_id !== session.user.id && (
+                  {admin.user_id !== session?.user.id && (
                     <Button variant="outline" size="sm" onClick={() => void removeAdministrator(admin.user_id)}>
                       <UserMinus className="mr-1 h-4 w-4" />
                       Remove
@@ -463,11 +467,13 @@ export default function AdminPage() {
             </div>
             {adminMessage && <p role="status" className="text-sm text-muted-foreground">{adminMessage}</p>}
           </div>
+          )}
+          {supabaseReady && (
           <div className="space-y-3 rounded-lg border p-4">
             <div>
               <h2 className="font-semibold">Change your password</h2>
               <p className="text-sm text-muted-foreground">
-                Update the password for your administrator account ({session.user.email}).
+                Update the password for your administrator account ({session?.user.email}).
               </p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -492,6 +498,7 @@ export default function AdminPage() {
               <p role="status" className="text-sm text-muted-foreground">{passwordMessage}</p>
             )}
           </div>
+          )}
           <div>
             <Button onClick={saveSettings}>
               <Save className="h-4 w-4 mr-1" />
