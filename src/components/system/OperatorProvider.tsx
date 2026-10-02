@@ -51,7 +51,7 @@ function OperatorLoginScreen({
   }
 
   return (
-    <main className="relative min-h-svh grid place-items-center md:place-items-end bg-[#0d6579] p-6 md:pr-[8vw]">
+    <main className="relative min-h-svh grid place-items-center bg-[#0d6579] p-6">
       <img
         src="/LGC_D%26G_Teams_Backgrounds_dark_teal_left_logo_orientation.png"
         alt=""
