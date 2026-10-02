@@ -69,6 +69,7 @@ import {
   type AdminUser,
 } from "@/components/system/AdminAccess";
 import { isSupabaseConfigured, getSupabase, getCustomDbConfig, setCustomDbConfig, testCustomDbConnection } from "@/lib/supabase-client";
+import { saveSettingsToSupabase } from "@/lib/settings-sync";
 export default function AdminPage() {
   const queryClient = useQueryClient();
   const { session, refreshAdminStatus } = useAdminAccess();
@@ -133,6 +134,7 @@ export default function AdminPage() {
   const [customDbKey, setCustomDbKey] = useState(getCustomDbConfig().anonKey);
   const [testStatus, setTestStatus] = useState<{ ok: boolean; message: string } | null>(null);
   const [testing, setTesting] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
   useEffect(() => {
     if (!supabaseReady) return;
     listAdminUsers().then(setAdminUsers).catch(() => setAdminMessage("Unable to load administrator accounts."));
@@ -190,7 +192,8 @@ export default function AdminPage() {
     setTestStatus(result);
     setTesting(false);
   }
-  function saveSettings() {
+  async function saveSettings() {
+    setSettingsMessage(null);
     setBarcodeDelimiter(delimiter || "|");
     setAuthorizedUsers(
       authorized
@@ -213,6 +216,17 @@ export default function AdminPage() {
         queryClient.invalidateQueries({ queryKey: ["jobs"] });
         queryClient.invalidateQueries({ queryKey: ["sessions-all"] });
       });
+    }
+    try {
+      const adminEmail = session?.user?.email ?? undefined;
+      await saveSettingsToSupabase(adminEmail);
+      setSettingsMessage("Settings saved and synced to the cloud database.");
+    } catch (e: unknown) {
+      setSettingsMessage(
+        e instanceof Error
+          ? `Settings saved locally, but cloud sync failed: ${e.message}`
+          : "Settings saved locally, but cloud sync failed.",
+      );
     }
   }
   function exportCSV(name: string, rows: object[]) {
@@ -565,11 +579,14 @@ export default function AdminPage() {
             )}
           </div>
           )}
-          <div>
-            <Button onClick={saveSettings}>
+          <div className="space-y-2">
+            <Button onClick={() => void saveSettings()}>
               <Save className="h-4 w-4 mr-1" />
               Save Settings
             </Button>
+            {settingsMessage && (
+              <p role="status" className="text-sm text-muted-foreground">{settingsMessage}</p>
+            )}
           </div>
         </TabsContent>
       </Tabs>

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { loadCatalogFromStorage } from "@/lib/material-catalog";
+import { loadSettingsFromSupabase } from "@/lib/settings-sync";
 import { OperatorProvider, useOperator } from "@/components/system/OperatorProvider";
 
 export function AppProviders({ children }: { children: ReactNode }) {
@@ -17,6 +18,11 @@ function ReadyApp({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      try {
+        await loadSettingsFromSupabase();
+      } catch {
+        // non-fatal: fall back to local defaults
+      }
       try {
         await loadCatalogFromStorage();
       } catch {
