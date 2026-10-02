@@ -1,12 +1,13 @@
-import { getSupabase, isSupabaseConfigured } from "@/lib/supabase-client";
+import { getSupabase, getCustomSupabase, isSupabaseConfigured, isCustomDbConfigured } from "@/lib/supabase-client";
 
-export type DataSourceType = "local" | "supabase";
+export type DataSourceType = "local" | "supabase" | "custom";
 
 const DS_KEY = "lgc:dataSource";
 
 export function getDataSourceType(): DataSourceType {
   const stored = localStorage.getItem(DS_KEY);
   if (stored === "supabase" && isSupabaseConfigured()) return "supabase";
+  if (stored === "custom" && isCustomDbConfigured()) return "custom";
   return "local";
 }
 
@@ -229,15 +230,16 @@ function sessionToDb(row: Omit<SessionRow, "ID" | "Created" | "Modified">): Reco
   };
 }
 
-const SupabaseBackend: DataSourceBackend = {
+function makeSupabaseBackend(getClient: () => ReturnType<typeof getSupabase>): DataSourceBackend {
+  return {
   async getAllJobs() {
-    const sb = getSupabase();
+    const sb = getClient();
     const { data, error } = await sb.from("batch_jobs").select("*");
     if (error) throw new Error(`Failed to load jobs: ${error.message}`);
     return (data ?? []).map(mapJobRow);
   },
   async createJob(data) {
-    const sb = getSupabase();
+    const sb = getClient();
     const id = genId("job");
     const { data: row, error } = await sb.from("batch_jobs")
       .insert({ id, ...jobToDb(data) })
@@ -247,7 +249,7 @@ const SupabaseBackend: DataSourceBackend = {
     return mapJobRow(row);
   },
   async updateJob(id, patch) {
-    const sb = getSupabase();
+    const sb = getClient();
     const dbPatch: Record<string, unknown> = { modified: new Date().toISOString() };
     if (patch.JobStatus !== undefined) dbPatch.job_status = patch.JobStatus;
     if (patch.CurrentStartTime !== undefined) dbPatch.current_start_time = patch.CurrentStartTime;
@@ -266,19 +268,19 @@ const SupabaseBackend: DataSourceBackend = {
     return mapJobRow(row);
   },
   async deleteJob(id) {
-    const sb = getSupabase();
+    const sb = getClient();
     const { error } = await sb.from("batch_jobs").delete().eq("id", id);
     if (error) throw new Error(`Failed to delete job: ${error.message}`);
   },
 
   async getAllSessions() {
-    const sb = getSupabase();
+    const sb = getClient();
     const { data, error } = await sb.from("batch_sessions").select("*");
     if (error) throw new Error(`Failed to load sessions: ${error.message}`);
     return (data ?? []).map(mapSessionRow);
   },
   async createSession(data) {
-    const sb = getSupabase();
+    const sb = getClient();
     const id = genId("ses");
     const { data: row, error } = await sb.from("batch_sessions")
       .insert({ id, ...sessionToDb(data) })
@@ -288,7 +290,7 @@ const SupabaseBackend: DataSourceBackend = {
     return mapSessionRow(row);
   },
   async updateSession(id, patch) {
-    const sb = getSupabase();
+    const sb = getClient();
     const dbPatch: Record<string, unknown> = { modified: new Date().toISOString() };
     if (patch.StopTime !== undefined) dbPatch.stop_time = patch.StopTime;
     if (patch.DurationSeconds !== undefined) dbPatch.duration_seconds = patch.DurationSeconds;
@@ -303,13 +305,13 @@ const SupabaseBackend: DataSourceBackend = {
     return mapSessionRow(row);
   },
   async deleteSession(id) {
-    const sb = getSupabase();
+    const sb = getClient();
     const { error } = await sb.from("batch_sessions").delete().eq("id", id);
     if (error) throw new Error(`Failed to delete session: ${error.message}`);
   },
 
   async getCatalogSnapshot() {
-    const sb = getSupabase();
+    const sb = getClient();
     const { data, error } = await sb.from("material_catalog_snapshot")
       .select("*")
       .eq("id", "current")
@@ -324,7 +326,7 @@ const SupabaseBackend: DataSourceBackend = {
     };
   },
   async replaceCatalogSnapshot(snap) {
-    const sb = getSupabase();
+    const sb = getClient();
     const payload = {
       id: "current",
       revision: snap.revision,
@@ -345,8 +347,12 @@ const SupabaseBackend: DataSourceBackend = {
     if (error) throw new Error(`Failed to insert catalog: ${error.message}`);
     return { revision: row.revision, importedAt: row.imported_at, sourceLabel: row.source_label, entries: row.entries };
   },
-};
+  };
+}
 
 export function getBackend(): DataSourceBackend {
-  return getDataSourceType() === "supabase" ? SupabaseBackend : LocalBackend;
+  const type = getDataSourceType();
+  if (type === "supabase") return makeSupabaseBackend(getSupabase);
+  if (type === "custom") return makeSupabaseBackend(getCustomSupabase);
+  return LocalBackend;
 }

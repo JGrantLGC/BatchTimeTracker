@@ -68,7 +68,7 @@ import {
   useAdminAccess,
   type AdminUser,
 } from "@/components/system/AdminAccess";
-import { isSupabaseConfigured, getSupabase } from "@/lib/supabase-client";
+import { isSupabaseConfigured, getSupabase, getCustomDbConfig, setCustomDbConfig, testCustomDbConnection } from "@/lib/supabase-client";
 export default function AdminPage() {
   const queryClient = useQueryClient();
   const { session, refreshAdminStatus } = useAdminAccess();
@@ -129,6 +129,10 @@ export default function AdminPage() {
     (s) => !s.StopTime && s.SessionStatus !== "Running",
   );
   const supabaseReady = isSupabaseConfigured();
+  const [customDbUrl, setCustomDbUrl] = useState(getCustomDbConfig().url);
+  const [customDbKey, setCustomDbKey] = useState(getCustomDbConfig().anonKey);
+  const [testStatus, setTestStatus] = useState<{ ok: boolean; message: string } | null>(null);
+  const [testing, setTesting] = useState(false);
   useEffect(() => {
     if (!supabaseReady) return;
     listAdminUsers().then(setAdminUsers).catch(() => setAdminMessage("Unable to load administrator accounts."));
@@ -179,6 +183,13 @@ export default function AdminPage() {
       setAdminMessage("You cannot remove your own administrator access.");
     }
   }
+  async function testConnection() {
+    setTestStatus(null);
+    setTesting(true);
+    const result = await testCustomDbConnection(customDbUrl, customDbKey);
+    setTestStatus(result);
+    setTesting(false);
+  }
   function saveSettings() {
     setBarcodeDelimiter(delimiter || "|");
     setAuthorizedUsers(
@@ -187,8 +198,15 @@ export default function AdminPage() {
         .map((s) => s.trim())
         .filter(Boolean),
     );
+    if (customDbUrl.trim() && customDbKey.trim()) {
+      setCustomDbConfig(customDbUrl, customDbKey);
+    }
     if (dataSource !== getDataSourceType()) {
-      setDataSourceType(dataSource);
+      if (dataSource === "custom" && (!customDbUrl.trim() || !customDbKey.trim())) {
+        setDataSourceType("local");
+      } else {
+        setDataSourceType(dataSource);
+      }
       loadCatalogFromStorage().then(() => {
         queryClient.invalidateQueries({ queryKey: ["materialCatalog"] });
         queryClient.invalidateQueries({ queryKey: ["jobs"] });
@@ -396,13 +414,60 @@ export default function AdminPage() {
             >
               <option value="local">Browser (Local) — survives refreshes on this device</option>
               {supabaseReady && <option value="supabase">Cloud Database (Supabase) — shared across all devices</option>}
+              <option value="custom">Custom Database — connect to another Supabase-compatible database</option>
             </select>
             <p className="text-xs text-muted-foreground">
               Choose where job, session, and material catalog data is stored. Cloud Database
               persists across devices and browsers. Browser stores data locally on this device only.
+              Custom Database lets you point to another Supabase-compatible database by entering its URL and API key below.
               {!supabaseReady && " Cloud Database is not available — no database is configured for this deployment."}
             </p>
           </div>
+          {dataSource === "custom" && (
+          <div className="space-y-3 rounded-lg border p-4">
+            <div>
+              <h2 className="font-semibold">Custom Database Connection</h2>
+              <p className="text-sm text-muted-foreground">
+                Enter the database URL and API key for another Supabase-compatible database. The database must have the same table structure (batch_jobs, batch_sessions, material_catalog_snapshot).
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="custom-db-url">Database URL</Label>
+              <Input
+                id="custom-db-url"
+                value={customDbUrl}
+                onChange={(e) => { setCustomDbUrl(e.target.value); setTestStatus(null); }}
+                placeholder="https://your-project.supabase.co"
+                className="font-mono"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="custom-db-key">API Key (anon key)</Label>
+              <Input
+                id="custom-db-key"
+                type="password"
+                value={customDbKey}
+                onChange={(e) => { setCustomDbKey(e.target.value); setTestStatus(null); }}
+                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                className="font-mono"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => void testConnection()} disabled={testing || !customDbUrl.trim() || !customDbKey.trim()}>
+                {testing ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1 h-4 w-4" />}
+                {testing ? "Testing…" : "Test Connection"}
+              </Button>
+              {testStatus && (
+                <p className={`text-sm font-medium ${testStatus.ok ? "text-status-running" : "text-status-error"}`}>
+                  {testStatus.message}
+                </p>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Click Test Connection to verify the database is reachable before saving. The credentials are stored in this browser only.
+            </p>
+          </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="delim">Barcode Delimiter</Label>
             <Input
