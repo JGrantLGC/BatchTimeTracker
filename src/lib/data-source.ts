@@ -48,6 +48,7 @@ export interface SessionRow {
   SessionStatus: string;
   OperatorEmail?: string;
   OperatorName?: string;
+  Department?: string;
   Created?: string;
   Modified?: string;
 }
@@ -195,6 +196,7 @@ function mapSessionRow(r: Record<string, unknown>): SessionRow {
     SessionStatus: r.session_status as string,
     OperatorEmail: r.operator_email as string | undefined,
     OperatorName: r.operator_name as string | undefined,
+    Department: r.department as string | undefined,
     Created: r.created as string | undefined,
     Modified: r.modified as string | undefined,
   };
@@ -228,6 +230,7 @@ function sessionToDb(row: Omit<SessionRow, "ID" | "Created" | "Modified">): Reco
     session_status: row.SessionStatus,
     operator_email: row.OperatorEmail ?? null,
     operator_name: row.OperatorName ?? null,
+    department: row.Department ?? null,
   };
 }
 
@@ -297,6 +300,7 @@ function makeSupabaseBackend(getClient: () => ReturnType<typeof getSupabase>): D
     if (patch.DurationSeconds !== undefined) dbPatch.duration_seconds = patch.DurationSeconds;
     if (patch.SessionStatus !== undefined) dbPatch.session_status = patch.SessionStatus;
     if (patch.MaterialDescription !== undefined) dbPatch.material_description = patch.MaterialDescription;
+    if (patch.Department !== undefined) dbPatch.department = patch.Department;
     const { data: row, error } = await sb.from("batch_sessions")
       .update(dbPatch)
       .eq("id", id)

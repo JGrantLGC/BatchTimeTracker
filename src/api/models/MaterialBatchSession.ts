@@ -13,6 +13,7 @@ export interface MaterialBatchSession {
   SessionStatus: SessionStatus;
   OperatorEmail?: string;
   OperatorName?: string;
+  Department?: string;
   Created?: string;
   Modified?: string;
 }

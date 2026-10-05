@@ -15,6 +15,7 @@ interface Filters {
   batch?: string;
   status?: string;
   operator?: string;
+  department?: string;
   runningOnly?: boolean;
   endedOnly?: boolean;
 }
@@ -57,6 +58,7 @@ export default function ReportsPage() {
       if (filters.material && !s.MaterialNumber.toLowerCase().includes(filters.material.toLowerCase())) return false;
       if (filters.batch && !s.BatchNumber.toLowerCase().includes(filters.batch.toLowerCase())) return false;
       if (filters.operator && !(s.OperatorName ?? s.OperatorEmail ?? "").toLowerCase().includes(filters.operator.toLowerCase())) return false;
+      if (filters.department && s.Department !== filters.department) return false;
       if (filters.runningOnly && s.SessionStatus !== "Running") return false;
       if (filters.from) {
         const fromMs = new Date(filters.from).getTime();
@@ -92,6 +94,15 @@ export default function ReportsPage() {
     for (const s of filteredSessions) {
       if (s.SessionStatus === "Running") continue;
       const key = s.OperatorName ?? s.OperatorEmail ?? "—";
+      m.set(key, (m.get(key) ?? 0) + (s.DurationSeconds ?? 0));
+    }
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
+  }, [filteredSessions]);
+  const totalByDepartment = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of filteredSessions) {
+      if (s.SessionStatus === "Running") continue;
+      const key = s.Department ?? "Unassigned";
       m.set(key, (m.get(key) ?? 0) + (s.DurationSeconds ?? 0));
     }
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
@@ -142,6 +153,21 @@ export default function ReportsPage() {
             <Input id="operator" onChange={(e) => setFilters((f) => ({ ...f, operator: e.target.value || undefined }))} />
           </div>
           <div>
+            <Label htmlFor="department">Department</Label>
+            <select
+              id="department"
+              className="border rounded-md h-10 px-2 w-full bg-transparent"
+              onChange={(e) => setFilters((f) => ({ ...f, department: e.target.value || undefined }))}
+              defaultValue=""
+            >
+              <option value="">Any</option>
+              <option value="filling">Filling</option>
+              <option value="kitting">Kitting</option>
+              <option value="lab operations">Lab Operations</option>
+              <option value="bioprocessing">Bioprocessing</option>
+            </select>
+          </div>
+          <div>
             <Label htmlFor="status">Job Status</Label>
             <select
               id="status"
@@ -180,6 +206,7 @@ export default function ReportsPage() {
           <TabsTrigger value="matbatch">Time by Material + Batch</TabsTrigger>
           <TabsTrigger value="material">Time by Material</TabsTrigger>
           <TabsTrigger value="operator">Time by Operator</TabsTrigger>
+          <TabsTrigger value="department">Time by Department</TabsTrigger>
         </TabsList>
         <TabsContent value="matbatch">
           <AggTable header="Material / Batch" rows={totalByMatBatch} />
@@ -189,6 +216,9 @@ export default function ReportsPage() {
         </TabsContent>
         <TabsContent value="operator">
           <AggTable header="Operator" rows={totalByOperator} />
+        </TabsContent>
+        <TabsContent value="department">
+          <AggTable header="Department" rows={totalByDepartment} />
         </TabsContent>
       </Tabs>
     </div>

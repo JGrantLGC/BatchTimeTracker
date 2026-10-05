@@ -253,6 +253,7 @@ export default function OperatorPage() {
         SessionStatus: "Running",
         OperatorEmail: operator.email,
         OperatorName: operator.name,
+        Department: operator.department,
       });
       return jobRow;
     },

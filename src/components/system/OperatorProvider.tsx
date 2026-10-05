@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import { setCurrentOperator, type Operator } from "@/lib/app-context";
+import { setCurrentOperator, DEPARTMENTS, type Department, type Operator } from "@/lib/app-context";
+import { getSupabaseOrNull, isSupabaseConfigured } from "@/lib/supabase-client";
 
 interface OperatorContextValue {
   operator: Operator;
@@ -7,6 +8,33 @@ interface OperatorContextValue {
 }
 
 const OperatorContext = createContext<OperatorContextValue | null>(null);
+
+interface OperatorRecord {
+  id: string;
+  name: string;
+  department: string;
+}
+
+async function lookupOperatorByName(name: string): Promise<OperatorRecord | null> {
+  const sb = getSupabaseOrNull();
+  if (!sb) return null;
+  const { data, error } = await sb
+    .from("operators")
+    .select("id, name, department")
+    .ilike("name", name.trim())
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as OperatorRecord;
+}
+
+async function saveOperatorDepartment(name: string, department: Department): Promise<void> {
+  const sb = getSupabaseOrNull();
+  if (!sb) return;
+  const { error } = await sb
+    .from("operators")
+    .upsert({ name: name.trim(), department }, { onConflict: "name,department" });
+  if (error) throw new Error(`Failed to save operator department: ${error.message}`);
+}
 
 export function OperatorProvider({ children }: { children: ReactNode }) {
   const [operator, setOperator] = useState<Operator | null>(null);
@@ -39,7 +67,39 @@ function OperatorLoginScreen({
   onContinue: (operator: Operator) => void;
 }) {
   const [name, setName] = useState("");
+  const [department, setDepartment] = useState<Department | "">("");
+  const [showDepartment, setShowDepartment] = useState(false);
+  const [checkingName, setCheckingName] = useState(false);
+  const [knownDepartment, setKnownDepartment] = useState<Department | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const dbReady = isSupabaseConfigured();
+
+  async function checkName(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed || !dbReady) {
+      setShowDepartment(true);
+      setKnownDepartment(null);
+      return;
+    }
+    setCheckingName(true);
+    try {
+      const existing = await lookupOperatorByName(trimmed);
+      if (existing) {
+        const dept = existing.department as Department;
+        setKnownDepartment(dept);
+        setDepartment(dept);
+        setShowDepartment(false);
+      } else {
+        setKnownDepartment(null);
+        setDepartment("");
+        setShowDepartment(true);
+      }
+    } catch {
+      setShowDepartment(true);
+    }
+    setCheckingName(false);
+  }
 
   function continueAsOperator() {
     const trimmedName = name.trim();
@@ -47,7 +107,16 @@ function OperatorLoginScreen({
       setError("Enter your name to continue.");
       return;
     }
-    onContinue({ name: trimmedName, email: "" });
+    const dept = (knownDepartment ?? department) as Department | "";
+    if (showDepartment && !dept) {
+      setError("Select your department to continue.");
+      return;
+    }
+    const resolvedDept = (knownDepartment ?? dept) as Department;
+    onContinue({ name: trimmedName, email: "", department: resolvedDept });
+    if (showDepartment && dbReady) {
+      void saveOperatorDepartment(trimmedName, resolvedDept).catch(() => {});
+    }
   }
 
   return (
@@ -72,9 +141,16 @@ function OperatorLoginScreen({
             <input
               id="operator-name"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value);
+                setError(null);
+              }}
+              onBlur={(event) => void checkName(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter") continueAsOperator();
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void checkName(name).then(() => continueAsOperator());
+                }
               }}
               autoComplete="name"
               autoFocus
@@ -82,6 +158,32 @@ function OperatorLoginScreen({
               placeholder="Your name"
             />
           </label>
+          {showDepartment && (
+            <label className="block space-y-1.5 text-sm font-medium" htmlFor="operator-department">
+              Department
+              <select
+                id="operator-department"
+                value={department}
+                onChange={(event) => {
+                  setDepartment(event.target.value as Department);
+                  setError(null);
+                }}
+                className="flex h-11 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="">Select your department…</option>
+                {DEPARTMENTS.map((d) => (
+                  <option key={d} value={d}>
+                    {d.charAt(0).toUpperCase() + d.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {knownDepartment && (
+            <p className="rounded-md bg-status-running/10 px-3 py-2 text-sm font-medium text-status-running">
+              Welcome back — your department is set to {knownDepartment}.
+            </p>
+          )}
           {error && (
             <p role="alert" className="rounded-md bg-status-error/10 px-3 py-2 text-sm font-medium text-status-error">
               {error}
@@ -89,10 +191,11 @@ function OperatorLoginScreen({
           )}
           <button
             type="button"
-            onClick={continueAsOperator}
-            className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+            onClick={() => void checkName(name).then(() => continueAsOperator())}
+            disabled={checkingName}
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
           >
-            Continue
+            {checkingName ? "Checking…" : "Continue"}
           </button>
         </div>
         <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">

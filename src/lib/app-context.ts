@@ -1,5 +1,7 @@
 import { memory } from "./memory-store";
-export interface Operator { name: string; email: string; }
+export type Department = "filling" | "kitting" | "lab operations" | "bioprocessing";
+export const DEPARTMENTS: Department[] = ["filling", "kitting", "lab operations", "bioprocessing"];
+export interface Operator { name: string; email: string; department?: Department; }
 const DELIMITER_KEY = "barcodeDelimiter";
 const OPERATOR_KEY = "currentOperator";
 const SAP_REFRESH_KEY = "lastSAPRefresh";

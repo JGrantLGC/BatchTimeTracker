@@ -15,6 +15,7 @@ function rowToModel(r: SessionRow): MaterialBatchSession {
     SessionStatus: r.SessionStatus as MaterialBatchSession["SessionStatus"],
     OperatorEmail: r.OperatorEmail,
     OperatorName: r.OperatorName,
+    Department: r.Department,
     Created: r.Created,
     Modified: r.Modified,
   };

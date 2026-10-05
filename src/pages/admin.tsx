@@ -35,6 +35,8 @@ import {
   setAuthorizedUsers,
   setBarcodeDelimiter,
   setLastSAPRefresh,
+  DEPARTMENTS,
+  type Department,
 } from "@/lib/app-context";
 import {
   getDataSourceType,
@@ -68,8 +70,14 @@ import {
   useAdminAccess,
   type AdminUser,
 } from "@/components/system/AdminAccess";
-import { isSupabaseConfigured, getSupabase, getCustomDbConfig, setCustomDbConfig, testCustomDbConnection } from "@/lib/supabase-client";
+import { isSupabaseConfigured, getSupabase, getSupabaseOrNull, getCustomDbConfig, setCustomDbConfig, testCustomDbConnection } from "@/lib/supabase-client";
 import { saveSettingsToSupabase } from "@/lib/settings-sync";
+
+interface OperatorRecord {
+  id: string;
+  name: string;
+  department: string;
+}
 export default function AdminPage() {
   const queryClient = useQueryClient();
   const { session, refreshAdminStatus } = useAdminAccess();
@@ -135,10 +143,55 @@ export default function AdminPage() {
   const [testStatus, setTestStatus] = useState<{ ok: boolean; message: string } | null>(null);
   const [testing, setTesting] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
+  const [operatorRecords, setOperatorRecords] = useState<OperatorRecord[]>([]);
+  const [operatorMessage, setOperatorMessage] = useState<string | null>(null);
+  const [operatorSearch, setOperatorSearch] = useState("");
   useEffect(() => {
     if (!supabaseReady) return;
     listAdminUsers().then(setAdminUsers).catch(() => setAdminMessage("Unable to load administrator accounts."));
   }, [supabaseReady]);
+  useEffect(() => {
+    if (!supabaseReady) return;
+    loadOperatorRecords();
+  }, [supabaseReady]);
+
+  async function loadOperatorRecords() {
+    const sb = getSupabaseOrNull();
+    if (!sb) return;
+    const { data, error } = await sb
+      .from("operators")
+      .select("id, name, department")
+      .order("name", { ascending: true });
+    if (error) {
+      setOperatorMessage("Unable to load operator records.");
+      return;
+    }
+    setOperatorRecords((data ?? []) as OperatorRecord[]);
+    setOperatorMessage(null);
+  }
+
+  async function updateOperatorDepartment(id: string, name: string, newDept: Department) {
+    const sb = getSupabaseOrNull();
+    if (!sb) return;
+    setOperatorMessage(null);
+    const { error } = await sb
+      .from("operators")
+      .delete()
+      .eq("id", id);
+    if (error) {
+      setOperatorMessage("Failed to update operator department.");
+      return;
+    }
+    const { error: insertError } = await sb
+      .from("operators")
+      .upsert({ name, department: newDept }, { onConflict: "name,department" });
+    if (insertError) {
+      setOperatorMessage("Failed to update operator department.");
+      return;
+    }
+    await loadOperatorRecords();
+    setOperatorMessage(`Updated ${name}'s department to ${newDept}.`);
+  }
   async function addAdministrator() {
     setAdminMessage(null);
     try {
@@ -508,6 +561,48 @@ export default function AdminPage() {
               Comma-separated. Authorized users can Stop or End another operator's Running job.
             </p>
           </div>
+          {supabaseReady && (
+          <div className="space-y-3 rounded-lg border p-4">
+            <div>
+              <h2 className="font-semibold">Operator departments</h2>
+              <p className="text-sm text-muted-foreground">
+                View and change the department assigned to each operator. Departments are used to filter sessions in reports.
+              </p>
+            </div>
+            <Input
+              placeholder="Search operator name…"
+              value={operatorSearch}
+              onChange={(e) => setOperatorSearch(e.target.value)}
+              className="max-w-sm"
+            />
+            <div className="divide-y rounded-md border max-h-72 overflow-y-auto">
+              {operatorRecords
+                .filter((op) => op.name.toLowerCase().includes(operatorSearch.trim().toLowerCase()))
+                .map((op) => (
+                  <div key={op.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                    <div className="min-0 flex-1 truncate font-medium">{op.name}</div>
+                    <select
+                      value={op.department}
+                      onChange={(e) => void updateOperatorDepartment(op.id, op.name, e.target.value as Department)}
+                      className="border rounded-md h-9 px-2 text-sm bg-transparent"
+                    >
+                      {DEPARTMENTS.map((d) => (
+                        <option key={d} value={d}>
+                          {d.charAt(0).toUpperCase() + d.slice(1)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              {operatorRecords.filter((op) => op.name.toLowerCase().includes(operatorSearch.trim().toLowerCase())).length === 0 && (
+                <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  No operators found.
+                </div>
+              )}
+            </div>
+            {operatorMessage && <p role="status" className="text-sm text-muted-foreground">{operatorMessage}</p>}
+          </div>
+          )}
           {supabaseReady && (
           <div className="space-y-3 rounded-lg border p-4">
             <div>
