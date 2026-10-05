@@ -30,9 +30,9 @@ function App() {
           <AppErrorBoundary>
             <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading…</div>}>
               <Routes>
+                <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/" element={<Layout />}>
                   <Route index element={<HomePage />} />
-                  <Route path="dashboard" element={<DashboardPage />} />
                   <Route path="admin" element={<AdminGate><AdminPage /></AdminGate>} />
                   <Route path="utilization-settings" element={<AdminGate><UtilizationSettingsPage /></AdminGate>} />
                   <Route path="reports" element={<ReportsPage />} />
