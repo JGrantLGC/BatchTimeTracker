@@ -3,13 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { MaterialBatchSessionService } from "@/api/services/MaterialBatchSessionService";
+import type { MaterialBatchSession } from "@/api/models/MaterialBatchSession";
 import {
   fetchUtilizationSettings,
   fetchBusinessDayCalendar,
   calculateUtilization,
   getMonthName,
 } from "@/lib/utilization";
-import { formatHMS } from "@/lib/time-utils";
+import { formatHMS, formatDateTime } from "@/lib/time-utils";
 import { LGCLogo, BrandHexPattern } from "@/components/system/LGCLogo";
 import { DEPARTMENTS } from "@/lib/app-context";
 
@@ -47,6 +48,8 @@ interface DeptSessionData {
   completed: number;
   totalSeconds: number;
 }
+
+const ENDED_STATUSES = new Set(["Ended", "ClosedByEnd", "Completed"]);
 
 export default function DashboardPage() {
   const now = new Date();
@@ -126,9 +129,16 @@ export default function DashboardPage() {
     );
   }, [sessionsQuery.data, year, month]);
 
+  const activeSessions = useMemo<MaterialBatchSession[]>(() => {
+    if (!sessionsQuery.data) return [];
+    return sessionsQuery.data
+      .filter((s) => !ENDED_STATUSES.has(s.SessionStatus))
+      .sort((a, b) => new Date(b.StartTime).getTime() - new Date(a.StartTime).getTime());
+  }, [sessionsQuery.data]);
+
   if (loading) {
     return (
-      <div className="min-h-svh grid place-items-center text-sm text-muted-foreground">
+      <div className="min-h-svh grid place-items-center text-sm text-neutral-400 bg-black">
         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
         Loading dashboard…
       </div>
@@ -137,7 +147,7 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="min-h-svh grid place-items-center p-6">
+      <div className="min-h-svh grid place-items-center p-6 bg-black">
         <div className="rounded-md border border-status-error/40 bg-status-error/10 px-4 py-3 text-sm text-status-error">
           {error}
         </div>
@@ -147,8 +157,8 @@ export default function DashboardPage() {
 
   if (!calc) {
     return (
-      <div className="min-h-svh grid place-items-center p-6">
-        <div className="rounded-md border px-4 py-3 text-sm text-muted-foreground">
+      <div className="min-h-svh grid place-items-center p-6 bg-black">
+        <div className="rounded-md border border-neutral-700 px-4 py-3 text-sm text-neutral-400">
           No data available.
         </div>
       </div>
@@ -161,9 +171,9 @@ export default function DashboardPage() {
   const gaugePct = Math.min(currentPct, 100);
 
   return (
-    <div className="flex flex-col min-h-svh bg-background">
+    <div className="flex flex-col min-h-svh bg-black text-neutral-100">
       {/* Branded header */}
-      <header className="border-b bg-brand-lead text-white shadow-sm relative overflow-hidden">
+      <header className="border-b border-neutral-800 bg-brand-lead text-white shadow-sm relative overflow-hidden">
         <BrandHexPattern className="absolute inset-0 h-full w-full text-white opacity-25" />
         <div className="relative mx-auto w-full max-w-7xl px-4 md:px-8 h-20 flex items-center gap-4">
           <div className="flex items-center gap-4">
@@ -191,7 +201,7 @@ export default function DashboardPage() {
       </header>
 
       {/* Fixed top section: utilization display */}
-      <div className="shrink-0 border-b bg-card">
+      <div className="shrink-0 border-b border-neutral-800 bg-neutral-950">
         <div className="mx-auto w-full max-w-7xl px-4 md:px-8 py-6 md:py-8">
           <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10">
             {/* Dial indicator */}
@@ -204,7 +214,7 @@ export default function DashboardPage() {
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="14"
-                  className="text-muted/25"
+                  className="text-neutral-700"
                 />
                 <circle
                   cx="100"
@@ -224,7 +234,7 @@ export default function DashboardPage() {
                 <span className={`text-2xl md:text-3xl font-bold ${colors.text}`}>
                   {currentPct.toFixed(1)}%
                 </span>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
+                <span className="text-[10px] uppercase tracking-wider text-neutral-500 mt-0.5">
                   Utilization
                 </span>
               </div>
@@ -242,32 +252,32 @@ export default function DashboardPage() {
                   {colors.label}
                 </span>
               </div>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-2 text-sm text-neutral-400">
                 Current utilization for {getMonthName(month)} {year}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 justify-center md:justify-start text-sm">
-                <span className="text-muted-foreground">
+                <span className="text-neutral-400">
                   Target:{" "}
-                  <span className="font-semibold text-foreground">
+                  <span className="font-semibold text-neutral-100">
                     {targetPct.toFixed(1)}%
                   </span>
                 </span>
-                <span className="text-muted-foreground">
+                <span className="text-neutral-400">
                   Accumulated:{" "}
-                  <span className="font-semibold font-mono text-foreground">
+                  <span className="font-semibold font-mono text-neutral-100">
                     {formatHMS(calc.currentSeconds)}
                   </span>{" "}
                   <span className="text-xs">({calc.currentHours.toFixed(1)}h)</span>
                 </span>
-                <span className="text-muted-foreground">
+                <span className="text-neutral-400">
                   Target hours MTD:{" "}
-                  <span className="font-semibold text-foreground">
+                  <span className="font-semibold text-neutral-100">
                     {calc.targetHoursElapsed.toFixed(1)}h
                   </span>
                 </span>
-                <span className="text-muted-foreground">
+                <span className="text-neutral-400">
                   Business days:{" "}
-                  <span className="font-semibold text-foreground">
+                  <span className="font-semibold text-neutral-100">
                     {calc.businessDaysElapsed}/{calc.totalBusinessDays}
                   </span>
                 </span>
@@ -277,66 +287,147 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Scrollable department sessions section */}
+      {/* Scrollable sessions section */}
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-7xl px-4 md:px-8 py-6">
-          <h2 className="text-lg font-bold tracking-tight mb-1">
-            Sessions by Department — {getMonthName(month)} {year}
-          </h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Current (running) and completed sessions for each department this month.
-          </p>
+        <div className="mx-auto w-full max-w-7xl px-4 md:px-8 py-6 space-y-8">
+          {/* Department totals */}
+          <section>
+            <h2 className="text-lg font-bold tracking-tight mb-1 text-neutral-100">
+              Sessions by Department — {getMonthName(month)} {year}
+            </h2>
+            <p className="text-sm text-neutral-400 mb-4">
+              Current (running) and completed sessions for each department this month.
+            </p>
 
-          {deptData.length === 0 ? (
-            <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground">
-              No sessions recorded this month yet.
-            </div>
-          ) : (
-            <div className="rounded-lg border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/40 sticky top-0">
-                  <tr>
-                    <th className="text-left px-4 py-3 font-semibold">Department</th>
-                    <th className="text-center px-4 py-3 font-semibold">
-                      Current Sessions
-                    </th>
-                    <th className="text-center px-4 py-3 font-semibold">
-                      Completed Sessions
-                    </th>
-                    <th className="text-right px-4 py-3 font-semibold">
-                      Total Time
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {deptData.map((d) => (
-                    <tr key={d.department} className="border-t">
-                      <td className="px-4 py-3 font-medium capitalize">
-                        {d.department}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {d.current > 0 ? (
-                          <span className="inline-flex items-center rounded-full bg-status-running/15 px-2.5 py-0.5 text-sm font-semibold text-status-running">
-                            {d.current}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">0</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center font-semibold">
-                        {d.completed}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono">
-                        {formatHMS(d.totalSeconds)}
-                      </td>
+            {deptData.length === 0 ? (
+              <div className="rounded-lg border border-neutral-800 p-8 text-center text-sm text-neutral-400">
+                No sessions recorded this month yet.
+              </div>
+            ) : (
+              <div className="rounded-lg border border-neutral-800 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-neutral-900">
+                    <tr>
+                      <th className="text-left px-4 py-3 font-semibold text-neutral-300">Department</th>
+                      <th className="text-center px-4 py-3 font-semibold text-neutral-300">
+                        Current Sessions
+                      </th>
+                      <th className="text-center px-4 py-3 font-semibold text-neutral-300">
+                        Completed Sessions
+                      </th>
+                      <th className="text-right px-4 py-3 font-semibold text-neutral-300">
+                        Total Time
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {deptData.map((d) => (
+                      <tr key={d.department} className="border-t border-neutral-800">
+                        <td className="px-4 py-3 font-medium capitalize text-neutral-100">
+                          {d.department}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {d.current > 0 ? (
+                            <span className="inline-flex items-center rounded-full bg-status-running/15 px-2.5 py-0.5 text-sm font-semibold text-status-running">
+                              {d.current}
+                            </span>
+                          ) : (
+                            <span className="text-neutral-500">0</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center font-semibold text-neutral-100">
+                          {d.completed}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-neutral-100">
+                          {formatHMS(d.totalSeconds)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
 
-          <p className="mt-6 text-center text-xs text-muted-foreground">
+          {/* Active / Stopped sessions */}
+          <section>
+            <h2 className="text-lg font-bold tracking-tight mb-1 text-neutral-100">
+              Active Sessions
+            </h2>
+            <p className="text-sm text-neutral-400 mb-4">
+              All sessions that are currently running or stopped (not ended).
+            </p>
+
+            {activeSessions.length === 0 ? (
+              <div className="rounded-lg border border-neutral-800 p-8 text-center text-sm text-neutral-400">
+                No active or stopped sessions.
+              </div>
+            ) : (
+              <div className="rounded-lg border border-neutral-800 overflow-hidden">
+                <div className="max-h-[400px] overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-neutral-900 sticky top-0">
+                      <tr>
+                        <th className="text-left px-4 py-3 font-semibold text-neutral-300">Status</th>
+                        <th className="text-left px-4 py-3 font-semibold text-neutral-300">Operator</th>
+                        <th className="text-left px-4 py-3 font-semibold text-neutral-300">Department</th>
+                        <th className="text-left px-4 py-3 font-semibold text-neutral-300">Material</th>
+                        <th className="text-left px-4 py-3 font-semibold text-neutral-300">Batch</th>
+                        <th className="text-left px-4 py-3 font-semibold text-neutral-300">Started</th>
+                        <th className="text-right px-4 py-3 font-semibold text-neutral-300">Duration</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeSessions.map((s) => {
+                        const isRunning = s.SessionStatus === "Running";
+                        const rowBg = isRunning
+                          ? "bg-status-running/10"
+                          : "bg-sky-500/10";
+                        return (
+                          <tr key={s.ID} className={`border-t border-neutral-800 ${rowBg}`}>
+                            <td className="px-4 py-3">
+                              <span
+                                className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wider ${
+                                  isRunning
+                                    ? "border-status-running/40 bg-status-running/20 text-status-running"
+                                    : "border-sky-400/40 bg-sky-400/20 text-sky-400"
+                                }`}
+                              >
+                                {s.SessionStatus}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-neutral-200">
+                              {s.OperatorName ?? "—"}
+                            </td>
+                            <td className="px-4 py-3 capitalize text-neutral-200">
+                              {s.Department ?? "Unassigned"}
+                            </td>
+                            <td className="px-4 py-3 text-neutral-200">
+                              <div className="font-medium">{s.MaterialNumber}</div>
+                              {s.MaterialDescription && (
+                                <div className="text-xs text-neutral-500">{s.MaterialDescription}</div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 font-mono text-neutral-200">
+                              {s.BatchNumber}
+                            </td>
+                            <td className="px-4 py-3 text-neutral-300">
+                              {formatDateTime(s.StartTime)}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-neutral-100">
+                              {s.DurationSeconds != null ? formatHMS(s.DurationSeconds) : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <p className="text-center text-xs text-neutral-500 pb-4">
             Cumberland Manufacturing &bull; Operational time capture. Not payroll,
             attendance, or performance data.
           </p>
