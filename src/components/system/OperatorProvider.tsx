@@ -43,7 +43,13 @@ export function OperatorProvider({ children }: { children: ReactNode }) {
     if (!operator) return null;
     return {
       operator,
-      changeOperator: () => setOperator(null),
+      changeOperator: () => {
+        const sb = getSupabaseOrNull();
+        if (sb) {
+          void sb.auth.signOut();
+        }
+        setOperator(null);
+      },
     };
   }, [operator]);
 
@@ -61,6 +67,11 @@ export function OperatorProvider({ children }: { children: ReactNode }) {
   return <OperatorContext.Provider value={value}>{children}</OperatorContext.Provider>;
 }
 
+interface NameCheckResult {
+  isKnown: boolean;
+  department: Department | null;
+}
+
 function OperatorLoginScreen({
   onContinue,
 }: {
@@ -75,12 +86,12 @@ function OperatorLoginScreen({
 
   const dbReady = isSupabaseConfigured();
 
-  async function checkName(value: string) {
+  async function checkName(value: string): Promise<NameCheckResult> {
     const trimmed = value.trim();
     if (!trimmed || !dbReady) {
       setShowDepartment(true);
       setKnownDepartment(null);
-      return;
+      return { isKnown: false, department: null };
     }
     setCheckingName(true);
     try {
@@ -90,33 +101,52 @@ function OperatorLoginScreen({
         setKnownDepartment(dept);
         setDepartment(dept);
         setShowDepartment(false);
+        return { isKnown: true, department: dept };
       } else {
         setKnownDepartment(null);
         setDepartment("");
         setShowDepartment(true);
+        return { isKnown: false, department: null };
       }
     } catch {
       setShowDepartment(true);
+      return { isKnown: false, department: null };
+    } finally {
+      setCheckingName(false);
     }
-    setCheckingName(false);
   }
 
-  function continueAsOperator() {
+  function continueAsOperator(checkResult?: NameCheckResult) {
     const trimmedName = name.trim();
     if (!trimmedName) {
       setError("Enter your name to continue.");
       return;
     }
-    const dept = (knownDepartment ?? department) as Department | "";
-    if (showDepartment && !dept) {
+
+    const isKnown = checkResult?.isKnown ?? knownDepartment != null;
+    const resolvedDept = checkResult?.department ?? knownDepartment;
+
+    if (!isKnown && !resolvedDept) {
+      const selectedDept = department as Department | "";
+      if (!selectedDept) {
+        setError("Select your department to continue.");
+        return;
+      }
+      onContinue({ name: trimmedName, email: "", department: selectedDept });
+      if (dbReady) {
+        void saveOperatorDepartment(trimmedName, selectedDept).catch(() => {});
+      }
+    } else if (resolvedDept) {
+      onContinue({ name: trimmedName, email: "", department: resolvedDept });
+    } else {
       setError("Select your department to continue.");
-      return;
     }
-    const resolvedDept = (knownDepartment ?? dept) as Department;
-    onContinue({ name: trimmedName, email: "", department: resolvedDept });
-    if (showDepartment && dbReady) {
-      void saveOperatorDepartment(trimmedName, resolvedDept).catch(() => {});
-    }
+  }
+
+  async function handleSubmit() {
+    setError(null);
+    const result = await checkName(name);
+    continueAsOperator(result);
   }
 
   return (
@@ -149,7 +179,7 @@ function OperatorLoginScreen({
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
-                  void checkName(name).then(() => continueAsOperator());
+                  void handleSubmit();
                 }
               }}
               autoComplete="name"
@@ -191,7 +221,7 @@ function OperatorLoginScreen({
           )}
           <button
             type="button"
-            onClick={() => void checkName(name).then(() => continueAsOperator())}
+            onClick={() => void handleSubmit()}
             disabled={checkingName}
             className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
           >
