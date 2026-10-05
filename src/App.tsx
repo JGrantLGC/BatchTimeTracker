@@ -6,6 +6,8 @@ import { queryClient } from "./lib/query-client";
 import { AppProviders } from "@/components/system/AppProviders";
 import HomePage from "./pages/index";
 import AdminPage from "./pages/admin";
+import DashboardPage from "./pages/dashboard";
+import UtilizationSettingsPage from "./pages/utilization-settings";
 import { AdminGate } from "./components/system/AdminAccess";
 import ReportsPage from "./pages/reports";
 import DiagnosticsPage from "./pages/diagnostics";
@@ -30,7 +32,9 @@ function App() {
               <Routes>
                 <Route path="/" element={<Layout />}>
                   <Route index element={<HomePage />} />
+                  <Route path="dashboard" element={<DashboardPage />} />
                   <Route path="admin" element={<AdminGate><AdminPage /></AdminGate>} />
+                  <Route path="utilization-settings" element={<AdminGate><UtilizationSettingsPage /></AdminGate>} />
                   <Route path="reports" element={<ReportsPage />} />
                   <Route path="diagnostics" element={<DiagnosticsPage />} />
                   <Route path="*" element={<NotFoundPage />} />

@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from "react-router-dom";
-import { ScanLine, ShieldCheck, BarChart3, UserCircle2, FlaskConical, RefreshCw } from "lucide-react";
+import { ScanLine, ShieldCheck, BarChart3, UserCircle2, FlaskConical, RefreshCw, Gauge } from "lucide-react";
 import { getCurrentOperator, getLastSAPRefresh } from "@/lib/app-context";
 import { formatDate } from "@/lib/time-utils";
 import { LGCLogo, BrandHexPattern } from "@/components/system/LGCLogo";
@@ -26,6 +26,7 @@ export default function Layout() {
   const lastRefresh = sapRefreshQuery.data ?? getLastSAPRefresh();
   const navItems = [
     { to: "/", label: "Operator", icon: ScanLine },
+    { to: "/dashboard", label: "Dashboard", icon: Gauge },
     { to: "/admin", label: "Administration", icon: ShieldCheck },
     { to: "/reports", label: "Reports", icon: BarChart3 },
     { to: "/diagnostics", label: "Diagnostics", icon: FlaskConical },
