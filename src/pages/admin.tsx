@@ -17,6 +17,7 @@ import {
   KeyRound,
   Gauge,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -363,13 +364,13 @@ export default function AdminPage() {
           Manage material master, jobs, sessions, and application settings.
         </p>
       </div>
-      <a
-        href="./utilization-settings"
+      <Link
+        to="/utilization-settings"
         className="inline-flex items-center gap-2 rounded-lg border bg-card px-4 py-3 text-sm font-medium transition-colors hover:bg-muted"
       >
         <Gauge className="h-5 w-5 text-brand-lead" />
         <span>Configure Utilization Dashboard settings — target rate, monthly hours, and business day calendar</span>
-      </a>
+      </Link>
       <Tabs defaultValue="materials">
         <TabsList className="flex flex-wrap">
           <TabsTrigger value="materials"><Package className="h-4 w-4 mr-1" /> Material Master</TabsTrigger>
