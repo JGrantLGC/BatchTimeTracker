@@ -107,9 +107,14 @@ export default function DashboardPage() {
     const currentSeconds = sessionsQuery.data
       .filter((s) => {
         const st = new Date(s.StartTime).toISOString();
-        return st >= monthStart && st < monthEnd && s.SessionStatus !== "Running";
+        return st >= monthStart && st < monthEnd;
       })
-      .reduce((sum, s) => sum + (s.DurationSeconds ?? 0), 0);
+      .reduce((sum, s) => {
+        if (s.SessionStatus === "Running") {
+          return sum + liveDurationSeconds(s.StartTime);
+        }
+        return sum + (s.DurationSeconds ?? 0);
+      }, 0);
     return calculateUtilization(
       currentSeconds,
       settingsQuery.data,
@@ -140,6 +145,7 @@ export default function DashboardPage() {
       if (!entry) continue;
       if (s.SessionStatus === "Running") {
         entry.current++;
+        entry.totalSeconds += liveDurationSeconds(s.StartTime);
       } else {
         entry.completed++;
         entry.totalSeconds += s.DurationSeconds ?? 0;
