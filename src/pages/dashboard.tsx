@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Loader2, ArrowLeft } from "lucide-react";
@@ -51,14 +51,28 @@ interface DeptSessionData {
 
 const ENDED_STATUSES = new Set(["Ended", "ClosedByEnd", "Completed"]);
 
+const REFRESH_INTERVAL_MS = 30_000;
+
+function liveDurationSeconds(startTime: string): number {
+  const start = new Date(startTime).getTime();
+  return Math.max(0, Math.floor((Date.now() - start) / 1000));
+}
+
 export default function DashboardPage() {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
 
+  const [, setTick] = useState(0);
+
   useEffect(() => {
     document.body.classList.add("bg-black");
     return () => document.body.classList.remove("bg-black");
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), REFRESH_INTERVAL_MS);
+    return () => clearInterval(id);
   }, []);
 
   const settingsQuery = useQuery({
@@ -74,6 +88,8 @@ export default function DashboardPage() {
   const sessionsQuery = useQuery({
     queryKey: ["sessions-all"],
     queryFn: () => MaterialBatchSessionService.getAll(),
+    refetchInterval: REFRESH_INTERVAL_MS,
+    refetchIntervalInBackground: true,
   });
 
   const loading =
@@ -420,7 +436,9 @@ export default function DashboardPage() {
                               {formatDateTime(s.StartTime)}
                             </td>
                             <td className="px-4 py-3 text-right font-mono text-neutral-100">
-                              {s.DurationSeconds != null ? formatHMS(s.DurationSeconds) : "—"}
+                              {isRunning
+                                ? formatHMS(liveDurationSeconds(s.StartTime))
+                                : s.DurationSeconds != null ? formatHMS(s.DurationSeconds) : "—"}
                             </td>
                           </tr>
                         );
