@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { MaterialBatchSessionService } from "@/api/services/MaterialBatchSessionService";
 import {
@@ -178,13 +179,13 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="ml-auto">
-            <a
-              href="./"
+            <Link
+              to="/"
               className="inline-flex items-center gap-2 rounded-md bg-white/15 px-3 py-2 text-sm font-semibold text-white/90 transition-colors hover:bg-white/25"
             >
               <ArrowLeft className="h-4 w-4" />
               <span className="hidden sm:inline">Back to Tracker</span>
-            </a>
+            </Link>
           </div>
         </div>
       </header>
