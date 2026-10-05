@@ -32,7 +32,7 @@ async function saveOperatorDepartment(name: string, department: Department): Pro
   if (!sb) return;
   const { error } = await sb
     .from("operators")
-    .upsert({ name: name.trim(), department }, { onConflict: "name,department" });
+    .upsert({ name: name.trim(), department }, { onConflict: "name" });
   if (error) throw new Error(`Failed to save operator department: ${error.message}`);
 }
 

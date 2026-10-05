@@ -178,16 +178,9 @@ export default function AdminPage() {
     setOperatorMessage(null);
     const { error } = await sb
       .from("operators")
-      .delete()
+      .update({ department: newDept, updated_at: new Date().toISOString() })
       .eq("id", id);
     if (error) {
-      setOperatorMessage("Failed to update operator department.");
-      return;
-    }
-    const { error: insertError } = await sb
-      .from("operators")
-      .upsert({ name, department: newDept }, { onConflict: "name,department" });
-    if (insertError) {
       setOperatorMessage("Failed to update operator department.");
       return;
     }
