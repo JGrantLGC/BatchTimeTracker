@@ -207,7 +207,7 @@ export default function AdminPage() {
     const previousDataSource = getDataSourceType();
     const savedDataSource =
       dataSource === "custom" && (!customDbUrl.trim() || !customDbKey.trim())
-        ? "local"
+        ? "supabase"
         : dataSource;
     setDataSourceType(savedDataSource);
     if (savedDataSource !== previousDataSource) {
@@ -427,14 +427,14 @@ export default function AdminPage() {
               value={dataSource}
               onChange={(e) => setDataSource(e.target.value as DataSourceType)}
             >
-              <option value="local">Browser (Local) — survives refreshes on this device</option>
+              <option value="">Select a data source…</option>
               {supabaseReady && <option value="supabase">Cloud Database (Supabase) — shared across all devices</option>}
               <option value="custom">Custom Database — connect to another Supabase-compatible database</option>
             </select>
             <p className="text-xs text-muted-foreground">
               Choose where job, session, and material catalog data is stored. Cloud Database
-              persists across devices and browsers. Browser stores data locally on this device only.
-              Custom Database lets you point to another Supabase-compatible database by entering its URL and API key below.
+              persists across devices and browsers. Custom Database lets you point to another
+              Supabase-compatible database by entering its URL and API key below.
               {!supabaseReady && " Cloud Database is not available — no database is configured for this deployment."}
             </p>
           </div>

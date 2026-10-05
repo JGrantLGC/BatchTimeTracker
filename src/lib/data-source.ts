@@ -6,8 +6,9 @@ const DS_KEY = "lgc:dataSource";
 
 export function getDataSourceType(): DataSourceType {
   const stored = localStorage.getItem(DS_KEY);
-  if (stored === "supabase" && isSupabaseConfigured()) return "supabase";
   if (stored === "custom" && isCustomDbConfigured()) return "custom";
+  if (isSupabaseConfigured()) return "supabase";
+  if (stored === "custom") return "custom";
   return "local";
 }
 
