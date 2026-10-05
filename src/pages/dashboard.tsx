@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Loader2, ArrowLeft } from "lucide-react";
@@ -55,6 +55,11 @@ export default function DashboardPage() {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
+
+  useEffect(() => {
+    document.body.classList.add("bg-black");
+    return () => document.body.classList.remove("bg-black");
+  }, []);
 
   const settingsQuery = useQuery({
     queryKey: ["utilization-settings"],
