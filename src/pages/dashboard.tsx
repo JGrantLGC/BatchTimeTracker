@@ -63,7 +63,7 @@ export default function DashboardPage() {
   const year = now.getFullYear();
   const month = now.getMonth();
 
-  const [, setTick] = useState(0);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     document.body.classList.add("bg-black");
@@ -121,7 +121,7 @@ export default function DashboardPage() {
       calendarQuery.data,
       now,
     );
-  }, [settingsQuery.data, calendarQuery.data, sessionsQuery.data, year, month, now]);
+  }, [settingsQuery.data, calendarQuery.data, sessionsQuery.data, year, month, now, tick]);
 
   const deptData = useMemo<DeptSessionData[]>(() => {
     if (!sessionsQuery.data) return [];
@@ -154,7 +154,7 @@ export default function DashboardPage() {
     return Array.from(map.values()).filter(
       (d) => d.current > 0 || d.completed > 0,
     );
-  }, [sessionsQuery.data, year, month]);
+  }, [sessionsQuery.data, year, month, tick]);
 
   const activeSessions = useMemo<MaterialBatchSession[]>(() => {
     if (!sessionsQuery.data) return [];
