@@ -36,20 +36,45 @@ export default function Layout() {
     <div className="bg-background text-foreground flex flex-col min-h-svh">
       <header className="border-b sticky top-0 z-40 bg-brand-lead text-white shadow-sm relative overflow-hidden">
         <BrandHexPattern className="absolute inset-0 h-full w-full text-white opacity-25" />
-        <div className="relative mx-auto w-full max-w-7xl px-2 md:px-4 h-[100px] flex items-center gap-2 md:gap-4 overflow-hidden">
-          <div className="flex shrink-0 items-center gap-2 md:gap-4">
-            <LGCLogo variant="reversed" className="h-14 md:h-16 w-auto" />
-            <div className="hidden md:block h-12 w-px bg-white/30" aria-hidden="true" />
-            <div className="hidden md:flex flex-col leading-tight text-left">
-              <span className="text-xs uppercase tracking-widest text-white/75 font-semibold">
-                Cumberland Manufacturing
-              </span>
-              <span className="text-base md:text-lg font-bold tracking-tight">
-                Material-Batch Time Tracker
-              </span>
+        <div className="relative mx-auto w-full max-w-7xl px-2 md:px-4 flex flex-col">
+          <div className="flex items-center justify-between gap-2 md:gap-4 py-2">
+            <div className="flex shrink-0 items-center gap-2 md:gap-4">
+              <LGCLogo variant="reversed" className="h-12 md:h-16 w-auto" />
+              <div className="hidden md:block h-12 w-px bg-white/30" aria-hidden="true" />
+              <div className="hidden md:flex flex-col leading-tight text-left">
+                <span className="text-xs uppercase tracking-widest text-white/75 font-semibold">
+                  Cumberland Manufacturing
+                </span>
+                <span className="text-base md:text-lg font-bold tracking-tight">
+                  Material-Batch Time Tracker
+                </span>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2 md:gap-3 text-xs md:text-sm whitespace-nowrap">
+              <div className="hidden md:flex flex-col items-end leading-tight">
+                <span className="opacity-80">Last SAP Refresh</span>
+                <span className="font-medium">{formatDate(lastRefresh)}</span>
+              </div>
+              <div className="flex items-center gap-2 rounded-md bg-white/15 px-3 py-1.5">
+                <UserCircle2 className="h-5 w-5" />
+                <div className="flex flex-col leading-tight">
+                  <span className="text-[11px] opacity-80">Operator</span>
+                  <span className="font-semibold">{currentOperator.name}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={changeOperator}
+                className="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-white/90 transition-colors hover:bg-white/15"
+                aria-label="Change operator"
+                title="Change operator"
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span className="hidden md:inline">Change</span>
+              </button>
             </div>
           </div>
-          <nav className="ml-2 md:ml-6 hidden lg:flex items-center gap-1 min-w-0">
+          <nav className="hidden lg:flex flex-wrap justify-center items-center gap-1 pb-2">
             {navItems.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
@@ -68,29 +93,6 @@ export default function Layout() {
               </NavLink>
             ))}
           </nav>
-          <div className="ml-auto flex shrink-0 items-center gap-2 md:gap-3 text-xs md:text-sm whitespace-nowrap">
-            <div className="hidden md:flex flex-col items-end leading-tight">
-              <span className="opacity-80">Last SAP Refresh</span>
-              <span className="font-medium">{formatDate(lastRefresh)}</span>
-            </div>
-            <div className="flex items-center gap-2 rounded-md bg-white/15 px-3 py-1.5">
-              <UserCircle2 className="h-5 w-5" />
-              <div className="flex flex-col leading-tight">
-                <span className="text-[11px] opacity-80">Operator</span>
-                <span className="font-semibold">{currentOperator.name}</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={changeOperator}
-              className="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-white/90 transition-colors hover:bg-white/15"
-              aria-label="Change operator"
-              title="Change operator"
-            >
-              <RefreshCw className="h-4 w-4" />
-              <span className="hidden md:inline">Change</span>
-            </button>
-          </div>
         </div>
         <div className="lg:hidden border-t border-white/25 relative">
           <div className="mx-auto max-w-7xl px-2 flex">
