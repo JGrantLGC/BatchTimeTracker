@@ -10,7 +10,7 @@ import {
   calculateUtilization,
   getMonthName,
 } from "@/lib/utilization";
-import { formatHMS, formatDateTime } from "@/lib/time-utils";
+import { formatHMS } from "@/lib/time-utils";
 import { LGCLogo, BrandHexPattern } from "@/components/system/LGCLogo";
 import { DEPARTMENTS } from "@/lib/app-context";
 
@@ -156,11 +156,29 @@ export default function DashboardPage() {
     );
   }, [sessionsQuery.data, year, month, tick]);
 
-  const activeSessions = useMemo<MaterialBatchSession[]>(() => {
+  const activeSessionsByDepartment = useMemo<Array<[string, MaterialBatchSession[]]>>(() => {
     if (!sessionsQuery.data) return [];
-    return sessionsQuery.data
-      .filter((s) => !ENDED_STATUSES.has(s.SessionStatus))
-      .sort((a, b) => new Date(b.StartTime).getTime() - new Date(a.StartTime).getTime());
+    const grouped = new Map<string, MaterialBatchSession[]>();
+    for (const session of sessionsQuery.data) {
+      if (ENDED_STATUSES.has(session.SessionStatus)) continue;
+      const department = session.Department ?? "Unassigned";
+      const sessions = grouped.get(department) ?? [];
+      sessions.push(session);
+      grouped.set(department, sessions);
+    }
+    for (const sessions of grouped.values()) {
+      sessions.sort(
+        (a, b) => new Date(b.StartTime).getTime() - new Date(a.StartTime).getTime(),
+      );
+    }
+    return Array.from(grouped.entries()).sort(([a], [b]) => {
+      const aIndex = DEPARTMENTS.indexOf(a as (typeof DEPARTMENTS)[number]);
+      const bIndex = DEPARTMENTS.indexOf(b as (typeof DEPARTMENTS)[number]);
+      if (a === "Unassigned") return 1;
+      if (b === "Unassigned") return -1;
+      return (aIndex < 0 ? DEPARTMENTS.length : aIndex) -
+        (bIndex < 0 ? DEPARTMENTS.length : bIndex);
+    });
   }, [sessionsQuery.data]);
 
   if (loading) {
@@ -382,76 +400,68 @@ export default function DashboardPage() {
               Active Sessions
             </h2>
             <p className="text-sm text-neutral-400 mb-4">
-              All sessions that are currently running or stopped (not ended).
+              All sessions that are currently running or stopped, grouped by department.
             </p>
 
-            {activeSessions.length === 0 ? (
+            {activeSessionsByDepartment.length === 0 ? (
               <div className="rounded-lg border border-neutral-800 p-8 text-center text-sm text-neutral-400">
                 No active or stopped sessions.
               </div>
             ) : (
-              <div className="rounded-lg border border-neutral-800 overflow-hidden">
-                <div className="max-h-[400px] overflow-y-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-neutral-900 sticky top-0">
-                      <tr>
-                        <th className="text-left px-4 py-3 font-semibold text-neutral-300">Status</th>
-                        <th className="text-left px-4 py-3 font-semibold text-neutral-300">Operator</th>
-                        <th className="text-left px-4 py-3 font-semibold text-neutral-300">Department</th>
-                        <th className="text-left px-4 py-3 font-semibold text-neutral-300">Material</th>
-                        <th className="text-left px-4 py-3 font-semibold text-neutral-300">Batch</th>
-                        <th className="text-left px-4 py-3 font-semibold text-neutral-300">Started</th>
-                        <th className="text-right px-4 py-3 font-semibold text-neutral-300">Duration</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activeSessions.map((s) => {
-                        const isRunning = s.SessionStatus === "Running";
-                        const rowBg = isRunning
-                          ? "bg-status-running/10"
-                          : "bg-sky-500/10";
-                        return (
-                          <tr key={s.ID} className={`border-t border-neutral-800 ${rowBg}`}>
-                            <td className="px-4 py-3">
-                              <span
-                                className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wider ${
-                                  isRunning
-                                    ? "border-status-running/40 bg-status-running/20 text-status-running"
-                                    : "border-sky-400/40 bg-sky-400/20 text-sky-400"
-                                }`}
-                              >
-                                {s.SessionStatus}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-neutral-200">
-                              {s.OperatorName ?? "—"}
-                            </td>
-                            <td className="px-4 py-3 capitalize text-neutral-200">
-                              {s.Department ?? "Unassigned"}
-                            </td>
-                            <td className="px-4 py-3 text-neutral-200">
-                              <div className="font-medium">{s.MaterialNumber}</div>
-                              {s.MaterialDescription && (
-                                <div className="text-xs text-neutral-500">{s.MaterialDescription}</div>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 font-mono text-neutral-200">
-                              {s.BatchNumber}
-                            </td>
-                            <td className="px-4 py-3 text-neutral-300">
-                              {formatDateTime(s.StartTime)}
-                            </td>
-                            <td className="px-4 py-3 text-right font-mono text-neutral-100">
-                              {isRunning
-                                ? formatHMS(liveDurationSeconds(s.StartTime))
-                                : s.DurationSeconds != null ? formatHMS(s.DurationSeconds) : "—"}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {activeSessionsByDepartment.map(([department, departmentSessions]) => (
+                  <section
+                    key={department}
+                    className="min-w-0 overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950"
+                  >
+                    <h3 className="border-b border-neutral-800 bg-neutral-900 px-4 py-3 font-semibold capitalize text-neutral-100">
+                      {department}
+                    </h3>
+                    <div className="h-[420px] overflow-y-auto">
+                      <div className="divide-y divide-neutral-800">
+                        {departmentSessions.map((s) => {
+                          const isRunning = s.SessionStatus === "Running";
+                          return (
+                            <article
+                              key={s.ID}
+                              className={`space-y-3 p-4 ${
+                                isRunning ? "bg-status-running/10" : "bg-sky-500/10"
+                              }`}
+                            >
+                              <div>
+                                <span
+                                  className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wider ${
+                                    isRunning
+                                      ? "border-status-running/40 bg-status-running/20 text-status-running"
+                                      : "border-sky-400/40 bg-sky-400/20 text-sky-400"
+                                  }`}
+                                >
+                                  {s.SessionStatus}
+                                </span>
+                              </div>
+                              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                                <dt className="text-neutral-500">Operator</dt>
+                                <dd className="truncate text-right text-neutral-200">{s.OperatorName ?? "—"}</dd>
+                                <dt className="text-neutral-500">Material</dt>
+                                <dd className="truncate text-right font-mono text-neutral-200">{s.MaterialNumber}</dd>
+                                <dt className="text-neutral-500">Batch</dt>
+                                <dd className="truncate text-right font-mono text-neutral-200">{s.BatchNumber}</dd>
+                                <dt className="text-neutral-500">Duration</dt>
+                                <dd className="text-right font-mono text-neutral-100">
+                                  {isRunning
+                                    ? formatHMS(liveDurationSeconds(s.StartTime))
+                                    : s.DurationSeconds != null
+                                      ? formatHMS(s.DurationSeconds)
+                                      : "—"}
+                                </dd>
+                              </dl>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </section>
+                ))}
               </div>
             )}
           </section>
