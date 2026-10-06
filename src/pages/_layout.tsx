@@ -49,7 +49,7 @@ export default function Layout() {
               </span>
             </div>
           </div>
-          <nav className="ml-2 md:ml-6 hidden lg:flex flex-1 items-center gap-1 min-w-0 overflow-hidden">
+          <nav className="ml-2 md:ml-6 hidden lg:flex items-center gap-1 min-w-0">
             {navItems.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
