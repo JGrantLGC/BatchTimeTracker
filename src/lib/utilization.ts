@@ -1,3 +1,4 @@
+import { reportDbError } from "@/lib/safe-error";
 import { getSupabase } from "@/lib/supabase-client";
 
 export interface UtilizationSettings {
@@ -19,7 +20,7 @@ export async function fetchUtilizationSettings(): Promise<UtilizationSettings> {
     .select("target_utilization_percent, total_monthly_hours")
     .eq("id", "current")
     .maybeSingle();
-  if (error) throw new Error(`Failed to load utilization settings: ${error.message}`);
+  if (error) throw new Error(reportDbError("Failed to load utilization settings", error));
   if (!data) return { targetUtilizationPercent: 85, totalMonthlyHours: 0 };
   return {
     targetUtilizationPercent: Number(data.target_utilization_percent) || 85,
@@ -41,7 +42,7 @@ export async function saveUtilizationSettings(
     updated_by: userId ?? null,
   };
   const { error } = await sb.from("utilization_settings").upsert(payload, { onConflict: "id" });
-  if (error) throw new Error(`Failed to save utilization settings: ${error.message}`);
+  if (error) throw new Error(reportDbError("Failed to save utilization settings", error));
 }
 
 export async function fetchBusinessDayCalendar(
@@ -57,7 +58,7 @@ export async function fetchBusinessDayCalendar(
     .gte("date", startDate)
     .lte("date", endDate)
     .order("date", { ascending: true });
-  if (error) throw new Error(`Failed to load business day calendar: ${error.message}`);
+  if (error) throw new Error(reportDbError("Failed to load business day calendar", error));
   return (data ?? []).map((r) => ({
     id: r.id as string,
     date: r.date as string,
@@ -78,7 +79,7 @@ export async function upsertBusinessDay(
       { date, is_business_day: isBusinessDay, label, updated_at: new Date().toISOString() },
       { onConflict: "date" },
     );
-  if (error) throw new Error(`Failed to save business day: ${error.message}`);
+  if (error) throw new Error(reportDbError("Failed to save business day", error));
 }
 
 export async function batchUpsertBusinessDays(
@@ -92,7 +93,7 @@ export async function batchUpsertBusinessDays(
     updated_at: new Date().toISOString(),
   }));
   const { error } = await sb.from("business_day_calendar").upsert(rows, { onConflict: "date" });
-  if (error) throw new Error(`Failed to save business days: ${error.message}`);
+  if (error) throw new Error(reportDbError("Failed to save business days", error));
 }
 
 export function isWeekend(date: Date): boolean {

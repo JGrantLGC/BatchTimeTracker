@@ -1,3 +1,4 @@
+import { reportDbError } from "@/lib/safe-error";
 import { getSupabase, getCustomSupabase, isSupabaseConfigured, isCustomDbConfigured } from "@/lib/supabase-client";
 
 export type DataSourceType = "local" | "supabase" | "custom";
@@ -239,7 +240,7 @@ function makeSupabaseBackend(getClient: () => ReturnType<typeof getSupabase>): D
   async getAllJobs() {
     const sb = getClient();
     const { data, error } = await sb.from("batch_jobs").select("*");
-    if (error) throw new Error(`Failed to load jobs: ${error.message}`);
+    if (error) throw new Error(reportDbError("Failed to load jobs", error));
     return (data ?? []).map(mapJobRow);
   },
   async createJob(data) {
@@ -249,7 +250,7 @@ function makeSupabaseBackend(getClient: () => ReturnType<typeof getSupabase>): D
       .insert({ id, ...jobToDb(data) })
       .select("*")
       .single();
-    if (error) throw new Error(`Failed to create job: ${error.message}`);
+    if (error) throw new Error(reportDbError("Failed to create job", error));
     return mapJobRow(row);
   },
   async updateJob(id, patch) {
@@ -268,19 +269,19 @@ function makeSupabaseBackend(getClient: () => ReturnType<typeof getSupabase>): D
       .eq("id", id)
       .select("*")
       .single();
-    if (error) throw new Error(`Failed to update job: ${error.message}`);
+    if (error) throw new Error(reportDbError("Failed to update job", error));
     return mapJobRow(row);
   },
   async deleteJob(id) {
     const sb = getClient();
     const { error } = await sb.from("batch_jobs").delete().eq("id", id);
-    if (error) throw new Error(`Failed to delete job: ${error.message}`);
+    if (error) throw new Error(reportDbError("Failed to delete job", error));
   },
 
   async getAllSessions() {
     const sb = getClient();
     const { data, error } = await sb.from("batch_sessions").select("*");
-    if (error) throw new Error(`Failed to load sessions: ${error.message}`);
+    if (error) throw new Error(reportDbError("Failed to load sessions", error));
     return (data ?? []).map(mapSessionRow);
   },
   async createSession(data) {
@@ -290,7 +291,7 @@ function makeSupabaseBackend(getClient: () => ReturnType<typeof getSupabase>): D
       .insert({ id, ...sessionToDb(data) })
       .select("*")
       .single();
-    if (error) throw new Error(`Failed to create session: ${error.message}`);
+    if (error) throw new Error(reportDbError("Failed to create session", error));
     return mapSessionRow(row);
   },
   async updateSession(id, patch) {
@@ -309,13 +310,13 @@ function makeSupabaseBackend(getClient: () => ReturnType<typeof getSupabase>): D
       .eq("id", id)
       .select("*")
       .single();
-    if (error) throw new Error(`Failed to update session: ${error.message}`);
+    if (error) throw new Error(reportDbError("Failed to update session", error));
     return mapSessionRow(row);
   },
   async deleteSession(id) {
     const sb = getClient();
     const { error } = await sb.from("batch_sessions").delete().eq("id", id);
-    if (error) throw new Error(`Failed to delete session: ${error.message}`);
+    if (error) throw new Error(reportDbError("Failed to delete session", error));
   },
 
   async getCatalogSnapshot() {
@@ -324,7 +325,7 @@ function makeSupabaseBackend(getClient: () => ReturnType<typeof getSupabase>): D
       .select("*")
       .eq("id", "current")
       .maybeSingle();
-    if (error) throw new Error(`Failed to load catalog: ${error.message}`);
+    if (error) throw new Error(reportDbError("Failed to load catalog", error));
     if (!data) return null;
     return {
       revision: data.revision as number,
@@ -347,12 +348,12 @@ function makeSupabaseBackend(getClient: () => ReturnType<typeof getSupabase>): D
     if (existing) {
       const { data: row, error } = await sb.from("material_catalog_snapshot")
         .update(payload).eq("id", "current").select("*").single();
-      if (error) throw new Error(`Failed to update catalog: ${error.message}`);
+      if (error) throw new Error(reportDbError("Failed to update catalog", error));
       return { revision: row.revision, importedAt: row.imported_at, sourceLabel: row.source_label, entries: row.entries };
     }
     const { data: row, error } = await sb.from("material_catalog_snapshot")
       .insert(payload).select("*").single();
-    if (error) throw new Error(`Failed to insert catalog: ${error.message}`);
+    if (error) throw new Error(reportDbError("Failed to insert catalog", error));
     return { revision: row.revision, importedAt: row.imported_at, sourceLabel: row.source_label, entries: row.entries };
   },
   };

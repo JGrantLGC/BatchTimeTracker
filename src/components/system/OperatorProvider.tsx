@@ -9,31 +9,25 @@ interface OperatorContextValue {
 
 const OperatorContext = createContext<OperatorContextValue | null>(null);
 
-interface OperatorRecord {
-  id: string;
-  name: string;
-  department: string;
-}
-
-async function lookupOperatorByName(name: string): Promise<OperatorRecord | null> {
+async function lookupOperatorDepartment(name: string): Promise<Department | null> {
   const sb = getSupabaseOrNull();
   if (!sb) return null;
-  const { data, error } = await sb
-    .from("operators")
-    .select("id, name, department")
-    .ilike("name", name.trim())
-    .maybeSingle();
+  const { data, error } = await sb.rpc("lookup_operator_department", { p_name: name.trim() });
   if (error || !data) return null;
-  return data as OperatorRecord;
+  return data as Department;
 }
 
 async function saveOperatorDepartment(name: string, department: Department): Promise<void> {
   const sb = getSupabaseOrNull();
   if (!sb) return;
-  const { error } = await sb
-    .from("operators")
-    .upsert({ name: name.trim(), department }, { onConflict: "name" });
-  if (error) throw new Error(`Failed to save operator department: ${error.message}`);
+  const { error } = await sb.rpc("register_operator", {
+    p_name: name.trim(),
+    p_department: department,
+  });
+  if (error) {
+    console.error("register_operator failed", error);
+    throw new Error("Failed to save operator department.");
+  }
 }
 
 export function OperatorProvider({ children }: { children: ReactNode }) {
@@ -95,9 +89,8 @@ function OperatorLoginScreen({
     }
     setCheckingName(true);
     try {
-      const existing = await lookupOperatorByName(trimmed);
-      if (existing) {
-        const dept = existing.department as Department;
+      const dept = await lookupOperatorDepartment(trimmed);
+      if (dept) {
         setKnownDepartment(dept);
         setDepartment(dept);
         setShowDepartment(false);

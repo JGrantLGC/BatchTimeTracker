@@ -55,11 +55,9 @@ export function AdminGate({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(async ({ data: sessionData }) => {
       if (!active) return;
       setSession(sessionData.session);
-      if (sessionData.session) {
-        const { data: setupData } = await supabase.rpc("admin_setup_available");
-        if (!active) return;
-        setSetupAvailable(Boolean(setupData));
-      }
+      const { data: setupData } = await supabase.rpc("admin_setup_available");
+      if (!active) return;
+      setSetupAvailable(Boolean(setupData));
       void refreshAdminStatus(sessionData.session);
     });
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
@@ -72,8 +70,11 @@ export function AdminGate({ children }: { children: ReactNode }) {
           await refreshAdminStatus(nextSession);
         })();
       } else {
-        setSetupAvailable(false);
-        void refreshAdminStatus(null);
+        (async () => {
+          const { data: setupData } = await supabase.rpc("admin_setup_available");
+          if (active) setSetupAvailable(Boolean(setupData));
+          await refreshAdminStatus(null);
+        })();
       }
     });
     return () => {
@@ -220,9 +221,9 @@ function AdminLoginScreen({
         </label>
         {error && <p role="alert" className="rounded-md bg-status-error/10 px-3 py-2 text-sm font-medium text-status-error">{error}</p>}
         <Button className="w-full" onClick={() => void submit()} disabled={busy}>{busy ? "Please wait…" : mode === "signUp" ? "Create administrator account" : "Sign in"}</Button>
-        {!setupAvailable && (
+        {setupAvailable && (
           <button type="button" className="w-full text-sm font-medium text-primary underline-offset-4 hover:underline" onClick={() => { setMode(mode === "signIn" ? "signUp" : "signIn"); setError(null); }}>
-            {mode === "signIn" ? "Create an administrator account" : "Back to administrator sign-in"}
+            {mode === "signIn" ? "Create the first administrator account" : "Back to administrator sign-in"}
           </button>
         )}
       </div>
@@ -246,8 +247,8 @@ function AdminClaimScreen({
   async function claim() {
     setBusy(true);
     setError(null);
-    const { error: claimError } = await getSupabase().rpc("claim_first_admin", { p_display_name: name.trim() });
-    if (claimError) {
+    const { data: claimed, error: claimError } = await getSupabase().rpc("claim_first_admin", { p_display_name: name.trim() });
+    if (claimError || claimed !== true) {
       setError(setupAvailable ? "Administrator setup is no longer available." : "This account does not have administrator access.");
     } else {
       await onClaimed();

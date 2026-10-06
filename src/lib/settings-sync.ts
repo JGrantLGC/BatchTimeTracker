@@ -1,3 +1,4 @@
+import { reportDbError } from "@/lib/safe-error";
 import { getSupabaseOrNull, isSupabaseConfigured } from "./supabase-client";
 import { memory } from "./memory-store";
 import {
@@ -55,7 +56,7 @@ export async function saveSettingsToSupabase(updaterEmail?: string): Promise<voi
     .from("app_settings")
     .update(patch)
     .eq("id", "current");
-  if (error) throw new Error(`Failed to save settings to database: ${error.message}`);
+  if (error) throw new Error(reportDbError("Failed to save settings to database", error));
 }
 
 export function getCachedSettings(): AppSettingsRow {

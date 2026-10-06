@@ -22,7 +22,7 @@ export class AppErrorBoundary extends Component<{ children: ReactNode }, State> 
         <div className="flex flex-col items-center justify-center min-h-svh gap-4 p-8 text-center">
           <h1 className="text-2xl font-bold">Something went wrong</h1>
           <p className="text-muted-foreground text-sm">
-            {this.state.error?.message ?? "An unexpected error occurred."}
+            An unexpected error occurred. Reloading the page usually clears it.
           </p>
           <button
             type="button"
