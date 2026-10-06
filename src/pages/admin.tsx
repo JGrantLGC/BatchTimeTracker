@@ -128,7 +128,7 @@ export default function AdminPage() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const filteredMaterials = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return materials.slice(0, 300);
+    if (!q) return [];
     return materials
       .filter(
         (m) =>
@@ -454,7 +454,7 @@ export default function AdminPage() {
                 {filteredMaterials.length === 0 && (
                   <tr>
                     <td colSpan={6} className="text-center px-3 py-6 text-muted-foreground">
-                      No matches.
+                      {search.trim() ? "No matches." : "Search for a material number or description above."}
                     </td>
                   </tr>
                 )}
