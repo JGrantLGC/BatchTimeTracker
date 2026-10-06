@@ -15,6 +15,8 @@ import {
   ShieldAlert,
   ChevronDown,
   ChevronUp,
+  Pencil,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { StatusBadge } from "@/components/operator/StatusBadge";
+import { SessionEditDialog, type EditMode } from "@/components/operator/SessionEditDialog";
 import {
   getBarcodeDelimiter,
   getCurrentOperator,
@@ -66,6 +69,9 @@ export default function OperatorPage() {
     batchNumber: string;
     totalSeconds: number;
   } | null>(null);
+  const [editMode, setEditMode] = useState<EditMode>("edit");
+  const [editSession, setEditSession] = useState<MaterialBatchSession | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const scannerInputRef = useRef<HTMLInputElement>(null);
   const operator = getCurrentOperator();
   // Fetch job for the resolved JobKey
@@ -396,6 +402,24 @@ export default function OperatorPage() {
         message: e instanceof Error ? e.message : "Failed to End.",
       }),
   });
+  const editSessionMutation = useMutation({
+    mutationFn: async (vars: { id: string; durationSeconds: number }) => {
+      await MaterialBatchSessionService.update(vars.id, {
+        DurationSeconds: vars.durationSeconds,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sessions", resolved?.jobKey] });
+      queryClient.invalidateQueries({ queryKey: ["operator-sessions", operator.name] });
+      queryClient.invalidateQueries({ queryKey: ["sessions-all"] });
+      setFeedback({ kind: "success", message: "Session time updated." });
+    },
+    onError: (e: unknown) =>
+      setFeedback({
+        kind: "error",
+        message: e instanceof Error ? e.message : "Failed to update session.",
+      }),
+  });
   const busy =
     startMutation.isPending || stopMutation.isPending || endMutation.isPending;
   const canStart =
@@ -674,6 +698,7 @@ export default function OperatorPage() {
                     <th className="text-left py-1 pr-2">Duration</th>
                     <th className="text-left py-1 pr-2">Status</th>
                     <th className="text-left py-1">JobKey</th>
+                    <th className="text-right py-1">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -694,6 +719,36 @@ export default function OperatorPage() {
                       </td>
                       <td className="py-1.5 pr-2">{s.SessionStatus}</td>
                       <td className="py-1.5 font-mono text-xs">{s.JobKey}</td>
+                      <td className="py-1.5 text-right whitespace-nowrap">
+                        {s.SessionStatus !== "Running" && (
+                          <>
+                            <button
+                              type="button"
+                              title="Edit session time"
+                              onClick={() => {
+                                setEditMode("edit");
+                                setEditSession(s);
+                                setEditOpen(true);
+                              }}
+                              className="inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              title="Add time to session"
+                              onClick={() => {
+                                setEditMode("add");
+                                setEditSession(s);
+                                setEditOpen(true);
+                              }}
+                              className="inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -817,6 +872,20 @@ export default function OperatorPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Session edit / add time dialog */}
+      <SessionEditDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        mode={editMode}
+        session={editSession}
+        onConfirm={async (patch) => {
+          if (!editSession) return;
+          if (patch.durationSeconds !== undefined) {
+            editSessionMutation.mutate({ id: editSession.ID, durationSeconds: patch.durationSeconds });
+          }
+          setEditOpen(false);
+        }}
+      />
     </div>
   );
 }

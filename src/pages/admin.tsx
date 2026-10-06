@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Download,
   Package,
@@ -16,6 +16,9 @@ import {
   UserMinus,
   KeyRound,
   Gauge,
+  Pencil,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -23,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/operator/StatusBadge";
+import { SessionEditDialog, type EditMode } from "@/components/operator/SessionEditDialog";
 import {
   Dialog,
   DialogContent,
@@ -148,6 +152,9 @@ export default function AdminPage() {
   const [operatorRecords, setOperatorRecords] = useState<OperatorRecord[]>([]);
   const [operatorMessage, setOperatorMessage] = useState<string | null>(null);
   const [operatorSearch, setOperatorSearch] = useState("");
+  const [editMode, setEditMode] = useState<EditMode>("edit");
+  const [editSession, setEditSession] = useState<MaterialBatchSession | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   useEffect(() => {
     if (!supabaseReady) return;
     listAdminUsers().then(setAdminUsers).catch(() => setAdminMessage("Unable to load administrator accounts."));
@@ -156,6 +163,26 @@ export default function AdminPage() {
     if (!supabaseReady) return;
     loadOperatorRecords();
   }, [supabaseReady]);
+
+  const editSessionMutation = useMutation({
+    mutationFn: async (vars: { id: string; durationSeconds: number }) => {
+      await MaterialBatchSessionService.update(vars.id, {
+        DurationSeconds: vars.durationSeconds,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sessions-all"] });
+    },
+  });
+
+  const deleteSessionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await MaterialBatchSessionService.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sessions-all"] });
+    },
+  });
 
   async function loadOperatorRecords() {
     const sb = getSupabaseOrNull();
@@ -463,14 +490,24 @@ export default function AdminPage() {
               Showing {sessions.length} session(s).
             </span>
           </div>
-          <SessionsTable sessions={sessions} />
+          <SessionsTable
+            sessions={sessions}
+            onEdit={(s) => { setEditMode("edit"); setEditSession(s); setEditOpen(true); }}
+            onAdd={(s) => { setEditMode("add"); setEditSession(s); setEditOpen(true); }}
+            onDelete={(s) => { setEditMode("delete"); setEditSession(s); setEditOpen(true); }}
+          />
         </TabsContent>
         {/* ORPHANS */}
         <TabsContent value="orphans" className="space-y-3">
           <p className="text-sm text-muted-foreground">
             Sessions with missing StopTime that are not currently Running (should be zero).
           </p>
-          <SessionsTable sessions={orphanSessions} />
+          <SessionsTable
+            sessions={orphanSessions}
+            onEdit={(s) => { setEditMode("edit"); setEditSession(s); setEditOpen(true); }}
+            onAdd={(s) => { setEditMode("add"); setEditSession(s); setEditOpen(true); }}
+            onDelete={(s) => { setEditMode("delete"); setEditSession(s); setEditOpen(true); }}
+          />
         </TabsContent>
         {/* SETTINGS */}
         <TabsContent value="settings" className="space-y-4 max-w-2xl">
@@ -821,6 +858,22 @@ export default function AdminPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Session edit / add / delete dialog */}
+      <SessionEditDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        mode={editMode}
+        session={editSession}
+        onConfirm={async (patch) => {
+          if (!editSession) return;
+          if (editMode === "delete") {
+            deleteSessionMutation.mutate(editSession.ID);
+          } else if (patch.durationSeconds !== undefined) {
+            editSessionMutation.mutate({ id: editSession.ID, durationSeconds: patch.durationSeconds });
+          }
+          setEditOpen(false);
+        }}
+      />
     </div>
   );
 }
@@ -868,7 +921,7 @@ function JobsTable({ jobs }: { jobs: MaterialBatchJob[] }) {
     </div>
   );
 }
-function SessionsTable({ sessions }: { sessions: MaterialBatchSession[] }) {
+function SessionsTable({ sessions, onEdit, onAdd, onDelete }: { sessions: MaterialBatchSession[]; onEdit: (s: MaterialBatchSession) => void; onAdd: (s: MaterialBatchSession) => void; onDelete: (s: MaterialBatchSession) => void; }) {
   return (
     <div className="rounded-md border overflow-x-auto">
       <table className="w-full text-sm">
@@ -882,6 +935,7 @@ function SessionsTable({ sessions }: { sessions: MaterialBatchSession[] }) {
             <th className="text-left px-3 py-2">Duration</th>
             <th className="text-left px-3 py-2">Status</th>
             <th className="text-left px-3 py-2">Operator</th>
+            <th className="text-right px-3 py-2">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -903,11 +957,37 @@ function SessionsTable({ sessions }: { sessions: MaterialBatchSession[] }) {
               </td>
               <td className="px-3 py-2">{s.SessionStatus}</td>
               <td className="px-3 py-2">{s.OperatorName ?? s.OperatorEmail ?? "—"}</td>
+              <td className="px-3 py-2 text-right whitespace-nowrap">
+                <button
+                  type="button"
+                  title="Edit session time"
+                  onClick={() => onEdit(s)}
+                  className="inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  title="Add time to session"
+                  onClick={() => onAdd(s)}
+                  className="inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  title="Delete session"
+                  onClick={() => onDelete(s)}
+                  className="inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:text-status-error hover:bg-status-error/10 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </td>
             </tr>
           ))}
           {sessions.length === 0 && (
             <tr>
-              <td colSpan={8} className="text-center px-3 py-6 text-muted-foreground">
+              <td colSpan={9} className="text-center px-3 py-6 text-muted-foreground">
                 No sessions.
               </td>
             </tr>

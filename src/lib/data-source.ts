@@ -296,11 +296,14 @@ function makeSupabaseBackend(getClient: () => ReturnType<typeof getSupabase>): D
   async updateSession(id, patch) {
     const sb = getClient();
     const dbPatch: Record<string, unknown> = { modified: new Date().toISOString() };
+    if (patch.StartTime !== undefined) dbPatch.start_time = patch.StartTime;
     if (patch.StopTime !== undefined) dbPatch.stop_time = patch.StopTime;
     if (patch.DurationSeconds !== undefined) dbPatch.duration_seconds = patch.DurationSeconds;
     if (patch.SessionStatus !== undefined) dbPatch.session_status = patch.SessionStatus;
     if (patch.MaterialDescription !== undefined) dbPatch.material_description = patch.MaterialDescription;
     if (patch.Department !== undefined) dbPatch.department = patch.Department;
+    if (patch.OperatorName !== undefined) dbPatch.operator_name = patch.OperatorName;
+    if (patch.OperatorEmail !== undefined) dbPatch.operator_email = patch.OperatorEmail;
     const { data: row, error } = await sb.from("batch_sessions")
       .update(dbPatch)
       .eq("id", id)
