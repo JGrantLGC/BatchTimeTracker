@@ -106,7 +106,7 @@ export default function ReportsPage() {
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
   }, [filteredSessions]);
   const completedSessions = filteredSessions.filter((s) => s.SessionStatus === "ClosedByEnd").length;
-  const runningJobs = filteredJobs.filter((j) => j.JobStatus === "Running").length;
+  const runningJobs = filteredSessions.filter((s) => s.SessionStatus === "Running" || s.SessionStatus === "Paused").length;
   const uniqueMaterials = useMemo(() => {
     const m = new Set<string>();
     for (const j of filteredJobs) m.add(j.MaterialNumber);
