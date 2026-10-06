@@ -49,7 +49,7 @@ interface DeptSessionData {
   totalSeconds: number;
 }
 
-const ENDED_STATUSES = new Set(["Ended", "ClosedByEnd", "Completed"]);
+const ENDED_STATUSES = new Set(["ClosedByEnd"]);
 
 const REFRESH_INTERVAL_MS = 30_000;
 
