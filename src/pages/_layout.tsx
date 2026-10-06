@@ -36,8 +36,8 @@ export default function Layout() {
     <div className="bg-background text-foreground flex flex-col min-h-svh">
       <header className="border-b sticky top-0 z-40 bg-brand-lead text-white shadow-sm relative overflow-hidden">
         <BrandHexPattern className="absolute inset-0 h-full w-full text-white opacity-25" />
-        <div className="relative mx-auto w-full max-w-7xl px-4 md:px-8 h-[100px] flex items-center gap-4">
-          <div className="flex shrink-0 items-center gap-4">
+        <div className="relative mx-auto w-full max-w-7xl px-2 md:px-4 h-[100px] flex items-center gap-2 md:gap-4">
+          <div className="flex shrink-0 items-center gap-2 md:gap-4">
             <LGCLogo variant="reversed" className="h-14 md:h-16 w-auto" />
             <div className="hidden md:block h-12 w-px bg-white/30" aria-hidden="true" />
             <div className="hidden md:flex flex-col leading-tight text-left">
@@ -49,7 +49,7 @@ export default function Layout() {
               </span>
             </div>
           </div>
-          <nav className="ml-6 hidden lg:flex items-center gap-1">
+          <nav className="ml-2 md:ml-6 hidden lg:flex items-center gap-1 min-w-0">
             {navItems.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
@@ -68,7 +68,7 @@ export default function Layout() {
               </NavLink>
             ))}
           </nav>
-          <div className="ml-auto flex items-center gap-3 text-xs md:text-sm">
+          <div className="ml-auto flex shrink-0 items-center gap-2 md:gap-3 text-xs md:text-sm">
             <div className="hidden md:flex flex-col items-end leading-tight">
               <span className="opacity-80">Last SAP Refresh</span>
               <span className="font-medium">{formatDate(lastRefresh)}</span>
