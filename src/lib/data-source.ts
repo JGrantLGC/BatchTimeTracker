@@ -18,24 +18,6 @@ export function setDataSourceType(type: DataSourceType): void {
 }
 
 // ── Row types (shared between both backends) ──
-export interface JobRow {
-  ID: string;
-  JobKey: string;
-  RawBarcode: string;
-  MaterialNumber: string;
-  MaterialDescription?: string;
-  BatchNumber: string;
-  JobStatus: string;
-  CurrentStartTime?: string;
-  TotalSeconds?: number;
-  EndedTime?: string;
-  LastOperatorEmail?: string;
-  LastOperatorName?: string;
-  LastActionTime?: string;
-  Created?: string;
-  Modified?: string;
-}
-
 export interface SessionRow {
   ID: string;
   JobKey: string;
@@ -70,11 +52,6 @@ export interface CatalogSnapshotRow {
 
 // ── Backend interface ──
 export interface DataSourceBackend {
-  getAllJobs(): Promise<JobRow[]>;
-  createJob(row: Omit<JobRow, "ID" | "Created" | "Modified">): Promise<JobRow>;
-  updateJob(id: string, patch: Partial<Omit<JobRow, "ID" | "Created" | "Modified">>): Promise<JobRow>;
-  deleteJob(id: string): Promise<void>;
-
   getAllSessions(): Promise<SessionRow[]>;
   createSession(row: Omit<SessionRow, "ID" | "Created" | "Modified">): Promise<SessionRow>;
   updateSession(id: string, patch: Partial<Omit<SessionRow, "ID" | "Created" | "Modified">>): Promise<SessionRow>;
@@ -85,7 +62,6 @@ export interface DataSourceBackend {
 }
 
 // ── Local (localStorage) backend ──
-const LS_JOBS = "lgc:jobs";
 const LS_SESSIONS = "lgc:sessions";
 const LS_CATALOG = "lgc:catalogSnapshot";
 
@@ -105,28 +81,6 @@ function genId(prefix: string): string {
 }
 
 const LocalBackend: DataSourceBackend = {
-  async getAllJobs() { return lsRead<JobRow>(LS_JOBS); },
-  async createJob(data) {
-    const now = new Date().toISOString();
-    const row: JobRow = { ...data, ID: genId("job"), Created: now, Modified: now };
-    const jobs = lsRead<JobRow>(LS_JOBS);
-    jobs.push(row);
-    lsWrite(LS_JOBS, jobs);
-    return row;
-  },
-  async updateJob(id, patch) {
-    const jobs = lsRead<JobRow>(LS_JOBS);
-    const idx = jobs.findIndex((j) => j.ID === id);
-    if (idx < 0) throw new Error(`Job ${id} not found.`);
-    const updated: JobRow = { ...jobs[idx], ...patch, ID: jobs[idx].ID, Modified: new Date().toISOString() };
-    jobs[idx] = updated;
-    lsWrite(LS_JOBS, jobs);
-    return updated;
-  },
-  async deleteJob(id) {
-    lsWrite(LS_JOBS, lsRead<JobRow>(LS_JOBS).filter((j) => j.ID !== id));
-  },
-
   async getAllSessions() { return lsRead<SessionRow>(LS_SESSIONS); },
   async createSession(data) {
     const now = new Date().toISOString();
@@ -164,25 +118,6 @@ const LocalBackend: DataSourceBackend = {
 };
 
 // ── Supabase backend ──
-function mapJobRow(r: Record<string, unknown>): JobRow {
-  return {
-    ID: r.id as string,
-    JobKey: r.job_key as string,
-    RawBarcode: r.raw_barcode as string,
-    MaterialNumber: r.material_number as string,
-    MaterialDescription: r.material_description as string | undefined,
-    BatchNumber: r.batch_number as string,
-    JobStatus: r.job_status as string,
-    CurrentStartTime: r.current_start_time as string | undefined,
-    TotalSeconds: r.total_seconds as number | undefined,
-    EndedTime: r.ended_time as string | undefined,
-    LastOperatorEmail: r.last_operator_email as string | undefined,
-    LastOperatorName: r.last_operator_name as string | undefined,
-    LastActionTime: r.last_action_time as string | undefined,
-    Created: r.created as string | undefined,
-    Modified: r.modified as string | undefined,
-  };
-}
 function mapSessionRow(r: Record<string, unknown>): SessionRow {
   return {
     ID: r.id as string,
@@ -200,22 +135,6 @@ function mapSessionRow(r: Record<string, unknown>): SessionRow {
     Department: r.department as string | undefined,
     Created: r.created as string | undefined,
     Modified: r.modified as string | undefined,
-  };
-}
-function jobToDb(row: Omit<JobRow, "ID" | "Created" | "Modified">): Record<string, unknown> {
-  return {
-    job_key: row.JobKey,
-    raw_barcode: row.RawBarcode,
-    material_number: row.MaterialNumber,
-    material_description: row.MaterialDescription ?? null,
-    batch_number: row.BatchNumber,
-    job_status: row.JobStatus,
-    current_start_time: row.CurrentStartTime ?? null,
-    total_seconds: row.TotalSeconds ?? 0,
-    ended_time: row.EndedTime ?? null,
-    last_operator_email: row.LastOperatorEmail ?? null,
-    last_operator_name: row.LastOperatorName ?? null,
-    last_action_time: row.LastActionTime ?? null,
   };
 }
 function sessionToDb(row: Omit<SessionRow, "ID" | "Created" | "Modified">): Record<string, unknown> {
@@ -237,47 +156,6 @@ function sessionToDb(row: Omit<SessionRow, "ID" | "Created" | "Modified">): Reco
 
 function makeSupabaseBackend(getClient: () => ReturnType<typeof getSupabase>): DataSourceBackend {
   return {
-  async getAllJobs() {
-    const sb = getClient();
-    const { data, error } = await sb.from("batch_jobs").select("*");
-    if (error) throw new Error(reportDbError("Failed to load jobs", error));
-    return (data ?? []).map(mapJobRow);
-  },
-  async createJob(data) {
-    const sb = getClient();
-    const id = genId("job");
-    const { data: row, error } = await sb.from("batch_jobs")
-      .insert({ id, ...jobToDb(data) })
-      .select("*")
-      .single();
-    if (error) throw new Error(reportDbError("Failed to create job", error));
-    return mapJobRow(row);
-  },
-  async updateJob(id, patch) {
-    const sb = getClient();
-    const dbPatch: Record<string, unknown> = { modified: new Date().toISOString() };
-    if (patch.JobStatus !== undefined) dbPatch.job_status = patch.JobStatus;
-    if (patch.CurrentStartTime !== undefined) dbPatch.current_start_time = patch.CurrentStartTime;
-    if (patch.TotalSeconds !== undefined) dbPatch.total_seconds = patch.TotalSeconds;
-    if (patch.EndedTime !== undefined) dbPatch.ended_time = patch.EndedTime;
-    if (patch.LastOperatorEmail !== undefined) dbPatch.last_operator_email = patch.LastOperatorEmail;
-    if (patch.LastOperatorName !== undefined) dbPatch.last_operator_name = patch.LastOperatorName;
-    if (patch.LastActionTime !== undefined) dbPatch.last_action_time = patch.LastActionTime;
-    if (patch.MaterialDescription !== undefined) dbPatch.material_description = patch.MaterialDescription;
-    const { data: row, error } = await sb.from("batch_jobs")
-      .update(dbPatch)
-      .eq("id", id)
-      .select("*")
-      .single();
-    if (error) throw new Error(reportDbError("Failed to update job", error));
-    return mapJobRow(row);
-  },
-  async deleteJob(id) {
-    const sb = getClient();
-    const { error } = await sb.from("batch_jobs").delete().eq("id", id);
-    if (error) throw new Error(reportDbError("Failed to delete job", error));
-  },
-
   async getAllSessions() {
     const sb = getClient();
     const { data, error } = await sb.from("batch_sessions").select("*");

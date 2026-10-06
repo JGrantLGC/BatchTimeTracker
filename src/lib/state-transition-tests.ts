@@ -1,21 +1,22 @@
 /**
  * Automated state-transition tests for the Cumberland Material-Batch Time Tracker.
  *
- * These tests exercise the LIVE data services (MaterialBatchJobService and
- * MaterialBatchSessionService) using isolated TEST-* JobKeys, then clean up.
+ * These tests exercise the LIVE data services using isolated TEST-* JobKeys,
+ * then clean up. Jobs are now derived from sessions — there is no separate
+ * batch_jobs table — so all mutations go through MaterialBatchSessionService.
  *
  * Key invariants proven:
  *   - Exactly one Running session per JobKey at any time.
- *   - SUM(session.DurationSeconds) === job.TotalSeconds after every terminal
- *     state (this is the definitive no-double-count check).
+ *   - SUM(session.DurationSeconds) === derived job.TotalSeconds after every
+ *     terminal state (this is the definitive no-double-count check).
  *   - TotalSeconds preserved across the Stopped -> Running boundary.
  *   - End closes at most one session (never zero, never two).
+ *   - End while Stopped creates a zero-duration ClosedByEnd marker session.
  *   - Two different MaterialNumbers sharing the same BatchNumber produce
  *     distinct JobKeys with independent totals.
  */
  import { MaterialBatchJobService } from "@/api/services/MaterialBatchJobService";
  import { MaterialBatchSessionService } from "@/api/services/MaterialBatchSessionService";
- import type { MaterialBatchJob } from "@/api/models/MaterialBatchJob";
  import type { MaterialBatchSession } from "@/api/models/MaterialBatchSession";
  import { getBarcodeDelimiter, getCurrentOperator } from "@/lib/app-context";
  import { parseBarcode } from "@/lib/barcode";
@@ -40,9 +41,8 @@
  // ---------------------------------------------------------------------------
  // Test harness helpers
  // ---------------------------------------------------------------------------
- async function findJobByKey(jobKey: string): Promise<MaterialBatchJob | null> {
-   const all = await MaterialBatchJobService.getAll();
-   return all.find((j) => j.JobKey === jobKey) ?? null;
+ async function findJobByKey(jobKey: string) {
+   return await MaterialBatchJobService.getByJobKey(jobKey);
  }
  async function findSessionsForJobKey(
    jobKey: string,
@@ -64,17 +64,16 @@
  function sleep(ms: number): Promise<void> {
    return new Promise((resolve) => setTimeout(resolve, ms));
  }
- /** Start behavior (matches operator screen logic). */
+ /** Start behavior — creates a Running session only (no job table). */
  async function doStart(
    jobKey: string,
    materialNumber: string,
    batchNumber: string,
    materialDescription: string,
-   rawBarcode: string,
- ): Promise<MaterialBatchJob> {
+   _rawBarcode: string,
+ ): Promise<void> {
    const operator = getCurrentOperator();
    const startTime = nowIso();
-   let jobRow: MaterialBatchJob;
    const existing = await findJobByKey(jobKey);
    if (existing?.JobStatus === "Running") {
      throw new Error("Already Running.");
@@ -82,45 +81,20 @@
    if (existing?.JobStatus === "Ended") {
      throw new Error("Ended job cannot restart.");
    }
-   if (!existing) {
-     jobRow = await MaterialBatchJobService.create({
-       JobKey: jobKey,
-       RawBarcode: rawBarcode,
-       MaterialNumber: materialNumber,
-       MaterialDescription: materialDescription,
-       BatchNumber: batchNumber,
-       JobStatus: "Running",
-       CurrentStartTime: startTime,
-       TotalSeconds: 0,
-       EndedTime: undefined,
-       LastOperatorEmail: operator.email,
-       LastOperatorName: operator.name,
-       LastActionTime: startTime,
-     });
-   } else {
-     jobRow = await MaterialBatchJobService.update(existing.ID, {
-       JobStatus: "Running",
-       CurrentStartTime: startTime,
-       LastOperatorEmail: operator.email,
-       LastOperatorName: operator.name,
-       LastActionTime: startTime,
-       TotalSeconds: existing.TotalSeconds ?? 0,
-     });
-   }
    await MaterialBatchSessionService.create({
-     JobKey: jobRow.JobKey,
-     JobID: jobRow.ID,
-     MaterialNumber: jobRow.MaterialNumber,
-     MaterialDescription: jobRow.MaterialDescription ?? "",
-     BatchNumber: jobRow.BatchNumber,
+     JobKey: jobKey,
+     JobID: `derived-${jobKey}`,
+     MaterialNumber: materialNumber,
+     MaterialDescription: materialDescription,
+     BatchNumber: batchNumber,
      StartTime: startTime,
      StopTime: undefined,
      DurationSeconds: 0,
      SessionStatus: "Running",
      OperatorEmail: operator.email,
      OperatorName: operator.name,
+     Department: operator.department,
    });
-   return jobRow;
  }
  async function doStop(jobKey: string): Promise<number> {
    const operator = getCurrentOperator();
@@ -137,15 +111,8 @@
      DurationSeconds: duration,
      SessionStatus: "Paused",
    });
-   const newTotal = (job.TotalSeconds ?? 0) + duration;
-   await MaterialBatchJobService.update(job.ID, {
-     JobStatus: "Stopped",
-     CurrentStartTime: undefined,
-     TotalSeconds: newTotal,
-     LastOperatorEmail: operator.email,
-     LastOperatorName: operator.name,
-     LastActionTime: stopTime,
-   });
+   // Touch operator info on the session for consistency
+   void operator;
    return duration;
  }
  async function doEnd(jobKey: string): Promise<{ finalTotal: number; closedByEnd: number }> {
@@ -169,33 +136,33 @@
        addedFromClose = duration;
        closedByEnd = 1;
      }
+   } else {
+     // Stopped — create a zero-duration ClosedByEnd marker session
+     await MaterialBatchSessionService.create({
+       JobKey: jobKey,
+       JobID: `derived-${jobKey}`,
+       MaterialNumber: job.MaterialNumber,
+       MaterialDescription: job.MaterialDescription ?? "",
+       BatchNumber: job.BatchNumber,
+       StartTime: endTime,
+       StopTime: endTime,
+       DurationSeconds: 0,
+       SessionStatus: "ClosedByEnd",
+       OperatorEmail: operator.email,
+       OperatorName: operator.name,
+       Department: operator.department,
+     });
+     closedByEnd = 1;
    }
    const finalTotal = (job.TotalSeconds ?? 0) + addedFromClose;
-   await MaterialBatchJobService.update(job.ID, {
-     JobStatus: "Ended",
-     CurrentStartTime: undefined,
-     TotalSeconds: finalTotal,
-     EndedTime: endTime,
-     LastOperatorEmail: operator.email,
-     LastOperatorName: operator.name,
-     LastActionTime: endTime,
-   });
    return { finalTotal, closedByEnd };
  }
- /** Delete a job and all of its sessions. Used for post-test cleanup. */
+ /** Delete all sessions for a JobKey. Used for post-test cleanup. */
  async function cleanup(jobKey: string): Promise<void> {
-   const job = await findJobByKey(jobKey);
    const sessions = await findSessionsForJobKey(jobKey);
    for (const s of sessions) {
      try {
        await MaterialBatchSessionService.delete(s.ID);
-     } catch {
-       // ignore
-     }
-   }
-   if (job) {
-     try {
-       await MaterialBatchJobService.delete(job.ID);
      } catch {
        // ignore
      }
@@ -241,7 +208,6 @@
  } {
    const entries = getAllCatalogEntries();
    const active = entries.filter((e) => e.materialStatus === "Active");
-   // Try to grab our seeded examples first
    const preferredA = active.find((e) => e.materialNumber === "68-000018");
    const preferredB = active.find((e) => e.materialNumber === "72-100001");
    const a = preferredA ?? active[0];
@@ -265,7 +231,7 @@
        try {
          await doStart(jobKey, "TEST-MAT-A", "TEST-BATCH-A", "Test Material A", jobKey);
          const job = await findJobByKey(jobKey);
-         assert(a, "Job row exists", !!job, `jobKey=${jobKey}`);
+         assert(a, "Derived job exists", !!job, `jobKey=${jobKey}`);
          assert(a, "JobStatus is Running", job?.JobStatus === "Running");
          assert(a, "TotalSeconds is 0 initially", (job?.TotalSeconds ?? -1) === 0);
          assert(a, "CurrentStartTime is set", !!job?.CurrentStartTime);
@@ -374,7 +340,7 @@
  }
  async function testEndWhileStoppedPreservesTotal(): Promise<TestResult> {
    return runTest(
-     "End while Stopped preserves total (no ClosedByEnd session created)",
+     "End while Stopped preserves total (marker ClosedByEnd session created)",
      async (a) => {
        const jobKey = `TEST-END-STOPPED-${Date.now()}`;
        try {
@@ -386,7 +352,7 @@
            (s) => s.SessionStatus === "ClosedByEnd",
          ).length;
          const { finalTotal, closedByEnd } = await doEnd(jobKey);
-         assert(a, "End reported 0 sessions closed", closedByEnd === 0);
+         assert(a, "End reported 1 session closed (marker)", closedByEnd === 1);
          assert(
            a,
            "Final total equals prior Stop duration",
@@ -402,8 +368,8 @@
          ).length;
          assert(
            a,
-           "No new ClosedByEnd session created",
-           closedByEndAfter === closedByEndBefore,
+           "Exactly 1 ClosedByEnd session (the marker)",
+           closedByEndAfter === closedByEndBefore + 1,
            `before=${closedByEndBefore} after=${closedByEndAfter}`,
          );
        } finally {
@@ -547,14 +513,12 @@
          const dB1 = await doStop(jobKeyB);
          const jobA = await findJobByKey(jobKeyA);
          const jobB = await findJobByKey(jobKeyB);
-         assert(a, "Two distinct MaterialBatchJobs rows exist", !!jobA && !!jobB && jobA.ID !== jobB.ID, `A.ID=${jobA?.ID} B.ID=${jobB?.ID}`);
+         assert(a, "Two distinct derived jobs exist", !!jobA && !!jobB, `A=${jobA?.JobKey} B=${jobB?.JobKey}`);
          assert(a, "Job A has primary MaterialNumber", jobA?.MaterialNumber === matA.number);
          assert(a, "Job B has alternate MaterialNumber", jobB?.MaterialNumber === matB.number);
          assert(a, "Both jobs share the same BatchNumber", jobA?.BatchNumber === sharedBatch && jobB?.BatchNumber === sharedBatch);
          assert(a, "Description snapshot on Job A matches primary material", jobA?.MaterialDescription === lookupA.materialDescription);
          assert(a, "Description snapshot on Job B matches alternate material", jobB?.MaterialDescription === lookupB.materialDescription);
-         assert(a, "Raw barcode preserved on Job A", jobA?.RawBarcode === barcodeA);
-         assert(a, "Raw barcode preserved on Job B", jobB?.RawBarcode === barcodeB);
          assert(a, "Job A total = sum of A's two session durations", (jobA?.TotalSeconds ?? -1) === dA1 + dA2, `A.total=${jobA?.TotalSeconds} expected=${dA1 + dA2}`);
          assert(a, "Job B total = B's one session duration", (jobB?.TotalSeconds ?? -1) === dB1, `B.total=${jobB?.TotalSeconds} expected=${dB1}`);
          assert(a, "A.total ≠ B.total — independent accounting", (jobA?.TotalSeconds ?? -1) !== (jobB?.TotalSeconds ?? -2));
@@ -595,4 +559,3 @@
      elapsedMs: performance.now() - suiteStart,
    };
  }
- 

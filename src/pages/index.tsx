@@ -41,7 +41,6 @@ import { parseBarcode } from "@/lib/barcode";
 import { formatDateTime, formatHMS, nowIso, secondsBetween } from "@/lib/time-utils";
 import { MaterialBatchJobService } from "@/api/services/MaterialBatchJobService";
 import { MaterialBatchSessionService } from "@/api/services/MaterialBatchSessionService";
-import type { MaterialBatchJob } from "@/api/models/MaterialBatchJob";
 import type { MaterialBatchSession } from "@/api/models/MaterialBatchSession";
 import { lookupMaterial } from "@/lib/material-catalog";
 type UiFeedback = { kind: "info" | "success" | "warning" | "error"; message: string } | null;
@@ -74,13 +73,12 @@ export default function OperatorPage() {
   const [editOpen, setEditOpen] = useState(false);
   const scannerInputRef = useRef<HTMLInputElement>(null);
   const operator = getCurrentOperator();
-  // Fetch job for the resolved JobKey
+  // Fetch derived job for the resolved JobKey
   const jobQuery = useQuery({
     queryKey: ["job", resolved?.jobKey],
     queryFn: async () => {
       if (!resolved) return null;
-      const list = await MaterialBatchJobService.getAll();
-      return list.find((j) => j.JobKey === resolved.jobKey) ?? null;
+      return await MaterialBatchJobService.getByJobKey(resolved.jobKey);
     },
     enabled: !!resolved,
   });
@@ -196,9 +194,8 @@ export default function OperatorPage() {
     mutationFn: async () => {
       if (!resolved) throw new Error("No resolved barcode.");
       if (!resolved.materialActive) throw new Error("Material is Inactive.");
-      // Re-check current job state right before write (S4)
-      const all = await MaterialBatchJobService.getAll();
-      const existing = all.find((j) => j.JobKey === resolved.jobKey) ?? null;
+      // Re-check current derived job state right before write
+      const existing = await MaterialBatchJobService.getByJobKey(resolved.jobKey);
       if (existing?.JobStatus === "Running")
         throw new Error("This JobKey is already Running.");
       if (existing?.JobStatus === "Ended")
@@ -220,39 +217,12 @@ export default function OperatorPage() {
         );
       }
       const startTime = nowIso();
-      let jobRow: MaterialBatchJob;
-      if (!existing) {
-        jobRow = await MaterialBatchJobService.create({
-          JobKey: resolved.jobKey,
-          RawBarcode: resolved.raw,
-          MaterialNumber: resolved.materialNumber,
-          MaterialDescription: resolved.materialDescription,
-          BatchNumber: resolved.batchNumber,
-          JobStatus: "Running",
-          CurrentStartTime: startTime,
-          TotalSeconds: 0,
-          EndedTime: undefined,
-          LastOperatorEmail: operator.email,
-          LastOperatorName: operator.name,
-          LastActionTime: startTime,
-        });
-      } else {
-        jobRow = await MaterialBatchJobService.update(existing.ID, {
-          JobStatus: "Running",
-          CurrentStartTime: startTime,
-          LastOperatorEmail: operator.email,
-          LastOperatorName: operator.name,
-          LastActionTime: startTime,
-          // preserve existing TotalSeconds
-          TotalSeconds: existing.TotalSeconds ?? 0,
-        });
-      }
       await MaterialBatchSessionService.create({
-        JobKey: jobRow.JobKey,
-        JobID: jobRow.ID,
-        MaterialNumber: jobRow.MaterialNumber,
-        MaterialDescription: jobRow.MaterialDescription ?? "",
-        BatchNumber: jobRow.BatchNumber,
+        JobKey: resolved.jobKey,
+        JobID: `derived-${resolved.jobKey}`,
+        MaterialNumber: resolved.materialNumber,
+        MaterialDescription: resolved.materialDescription,
+        BatchNumber: resolved.batchNumber,
         StartTime: startTime,
         StopTime: undefined,
         DurationSeconds: 0,
@@ -261,7 +231,6 @@ export default function OperatorPage() {
         OperatorName: operator.name,
         Department: operator.department,
       });
-      return jobRow;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["job", resolved?.jobKey] });
@@ -302,15 +271,6 @@ export default function OperatorPage() {
         StopTime: stopTime,
         DurationSeconds: duration,
         SessionStatus: "Paused",
-      });
-      const newTotal = (job.TotalSeconds ?? 0) + duration;
-      await MaterialBatchJobService.update(job.ID, {
-        JobStatus: "Stopped",
-        CurrentStartTime: undefined,
-        TotalSeconds: newTotal,
-        LastOperatorEmail: operator.email,
-        LastOperatorName: operator.name,
-        LastActionTime: stopTime,
       });
       return duration;
     },
@@ -363,17 +323,25 @@ export default function OperatorPage() {
           });
           addedFromClose = duration;
         }
+      } else {
+        // Job is Stopped (no Running session). Create a zero-duration
+        // ClosedByEnd marker session so the derived status becomes Ended.
+        await MaterialBatchSessionService.create({
+          JobKey: resolved.jobKey,
+          JobID: `derived-${resolved.jobKey}`,
+          MaterialNumber: resolved.materialNumber,
+          MaterialDescription: resolved.materialDescription,
+          BatchNumber: resolved.batchNumber,
+          StartTime: endTime,
+          StopTime: endTime,
+          DurationSeconds: 0,
+          SessionStatus: "ClosedByEnd",
+          OperatorEmail: operator.email,
+          OperatorName: operator.name,
+          Department: operator.department,
+        });
       }
       const finalTotal = (job.TotalSeconds ?? 0) + addedFromClose;
-      await MaterialBatchJobService.update(job.ID, {
-        JobStatus: "Ended",
-        CurrentStartTime: undefined,
-        TotalSeconds: finalTotal,
-        EndedTime: endTime,
-        LastOperatorEmail: operator.email,
-        LastOperatorName: operator.name,
-        LastActionTime: endTime,
-      });
       return { finalTotal };
     },
     onSuccess: ({ finalTotal }) => {
