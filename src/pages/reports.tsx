@@ -105,7 +105,7 @@ export default function ReportsPage() {
     }
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
   }, [filteredSessions]);
-  const completedSessions = filteredSessions.filter((s) => s.SessionStatus === "Paused" || s.SessionStatus === "ClosedByEnd").length;
+  const completedSessions = filteredSessions.filter((s) => s.SessionStatus === "ClosedByEnd").length;
   const runningJobs = filteredJobs.filter((j) => j.JobStatus === "Running").length;
   const uniqueMaterials = useMemo(() => {
     const m = new Set<string>();
@@ -208,7 +208,7 @@ export default function ReportsPage() {
       </div>
       {/* Totals */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <SummaryCard label="Paused Sessions" value={String(completedSessions)} />
+        <SummaryCard label="Completed Sessions" value={String(completedSessions)} />
         <SummaryCard label="Running Jobs" value={String(runningJobs)} />
         <SummaryCard label="Materials" value={String(uniqueMaterials)} />
         <SummaryCard label="Operators" value={String(uniqueOperators)} />

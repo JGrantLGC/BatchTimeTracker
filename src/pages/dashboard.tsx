@@ -46,6 +46,7 @@ interface DeptSessionData {
   department: string;
   current: number;
   completed: number;
+  paused: number;
   totalSeconds: number;
 }
 
@@ -148,12 +149,13 @@ export default function DashboardPage() {
     const monthEnd = new Date(year, month + 1, 1).toISOString();
     const map = new Map<string, DeptSessionData>();
     for (const dept of DEPARTMENTS) {
-      map.set(dept, { department: dept, current: 0, completed: 0, totalSeconds: 0 });
+      map.set(dept, { department: dept, current: 0, completed: 0, paused: 0, totalSeconds: 0 });
     }
     map.set("Unassigned", {
       department: "Unassigned",
       current: 0,
       completed: 0,
+      paused: 0,
       totalSeconds: 0,
     });
     for (const s of sessionsQuery.data) {
@@ -165,13 +167,16 @@ export default function DashboardPage() {
       if (s.SessionStatus === "Running") {
         entry.current++;
         entry.totalSeconds += liveDurationSeconds(s.StartTime);
-      } else {
+      } else if (s.SessionStatus === "Paused") {
+        entry.current++;
+        entry.totalSeconds += s.DurationSeconds ?? 0;
+      } else if (s.SessionStatus === "ClosedByEnd") {
         entry.completed++;
         entry.totalSeconds += s.DurationSeconds ?? 0;
       }
     }
     return Array.from(map.values()).filter(
-      (d) => d.current > 0 || d.completed > 0,
+      (d) => d.current > 0 || d.completed > 0 || d.paused > 0,
     );
   }, [sessionsQuery.data, year, month, tick]);
 
@@ -412,7 +417,7 @@ export default function DashboardPage() {
                         Current Sessions
                       </th>
                       <th className="text-center px-4 py-3 font-semibold text-neutral-300">
-                        Paused Sessions
+                        Completed Sessions
                       </th>
                       <th className="text-right px-4 py-3 font-semibold text-neutral-300">
                         Total Time
