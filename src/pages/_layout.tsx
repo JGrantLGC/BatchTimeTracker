@@ -36,10 +36,10 @@ export default function Layout() {
     <div className="bg-background text-foreground flex flex-col min-h-svh">
       <header className="border-b sticky top-0 z-40 bg-brand-lead text-white shadow-sm relative overflow-hidden">
         <BrandHexPattern className="absolute inset-0 h-full w-full text-white opacity-25" />
-        <div className="relative mx-auto w-full max-w-7xl px-4 md:px-8 h-20 flex items-center gap-4">
+        <div className="relative mx-auto w-full max-w-7xl px-4 md:px-8 h-[100px] flex items-center gap-4">
           <div className="flex items-center gap-4">
-            <LGCLogo variant="reversed" className="h-11 md:h-12 w-auto" />
-            <div className="hidden md:block h-10 w-px bg-white/30" aria-hidden="true" />
+            <LGCLogo variant="reversed" className="h-14 md:h-16 w-auto" />
+            <div className="hidden md:block h-12 w-px bg-white/30" aria-hidden="true" />
             <div className="hidden md:flex flex-col leading-tight">
               <span className="text-xs uppercase tracking-widest text-white/75 font-semibold">
                 Cumberland Manufacturing
