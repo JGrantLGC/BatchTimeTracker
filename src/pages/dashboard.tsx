@@ -191,9 +191,13 @@ export default function DashboardPage() {
       grouped.set(department, sessions);
     }
     for (const sessions of grouped.values()) {
-      sessions.sort(
-        (a, b) => new Date(b.StartTime).getTime() - new Date(a.StartTime).getTime(),
-      );
+      sessions.sort((a, b) => {
+        const statusOrder: Record<string, number> = { Running: 0, Paused: 1 };
+        const aOrder = statusOrder[a.SessionStatus] ?? 2;
+        const bOrder = statusOrder[b.SessionStatus] ?? 2;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        return new Date(b.StartTime).getTime() - new Date(a.StartTime).getTime();
+      });
     }
     return Array.from(grouped.entries()).sort(([a], [b]) => {
       const aOrder = columnOrder.indexOf(a);
