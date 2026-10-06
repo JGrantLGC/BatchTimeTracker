@@ -92,7 +92,6 @@ export default function ReportsPage() {
   const totalByOperator = useMemo(() => {
     const m = new Map<string, number>();
     for (const s of filteredSessions) {
-      if (s.SessionStatus === "Running") continue;
       const key = s.OperatorName ?? s.OperatorEmail ?? "—";
       m.set(key, (m.get(key) ?? 0) + (s.DurationSeconds ?? 0));
     }
@@ -101,14 +100,27 @@ export default function ReportsPage() {
   const totalByDepartment = useMemo(() => {
     const m = new Map<string, number>();
     for (const s of filteredSessions) {
-      if (s.SessionStatus === "Running") continue;
       const key = s.Department ?? "Unassigned";
       m.set(key, (m.get(key) ?? 0) + (s.DurationSeconds ?? 0));
     }
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
   }, [filteredSessions]);
-  const completedSessions = filteredSessions.filter((s) => s.SessionStatus !== "Running").length;
+  const completedSessions = filteredSessions.filter((s) => s.SessionStatus === "Completed" || s.SessionStatus === "ClosedByEnd").length;
   const runningJobs = filteredJobs.filter((j) => j.JobStatus === "Running").length;
+  const uniqueMaterials = useMemo(() => {
+    const m = new Set<string>();
+    for (const j of filteredJobs) m.add(j.MaterialNumber);
+    for (const s of filteredSessions) m.add(s.MaterialNumber);
+    return m.size;
+  }, [filteredJobs, filteredSessions]);
+  const uniqueOperators = useMemo(() => {
+    const m = new Set<string>();
+    for (const s of filteredSessions) {
+      const key = s.OperatorName ?? s.OperatorEmail ?? "";
+      if (key) m.add(key);
+    }
+    return m.size;
+  }, [filteredSessions]);
   return (
     <div className="space-y-6">
       <div>
@@ -198,8 +210,8 @@ export default function ReportsPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <SummaryCard label="Completed Sessions" value={String(completedSessions)} />
         <SummaryCard label="Running Jobs" value={String(runningJobs)} />
-        <SummaryCard label="Materials" value={String(totalByMaterial.length)} />
-        <SummaryCard label="Operators" value={String(totalByOperator.length)} />
+        <SummaryCard label="Materials" value={String(uniqueMaterials)} />
+        <SummaryCard label="Operators" value={String(uniqueOperators)} />
       </div>
       <Tabs defaultValue="matbatch">
         <TabsList>
