@@ -1,7 +1,7 @@
-import { useMemo, useEffect, useState } from "react";
+import { useMemo, useEffect, useState, type DragEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, ChevronLeft, ChevronRight, GripVertical, RotateCcw } from "lucide-react";
 import { MaterialBatchSessionService } from "@/api/services/MaterialBatchSessionService";
 import type { MaterialBatchSession } from "@/api/models/MaterialBatchSession";
 import {
@@ -12,7 +12,7 @@ import {
 } from "@/lib/utilization";
 import { formatHMS } from "@/lib/time-utils";
 import { LGCLogo, BrandHexPattern } from "@/components/system/LGCLogo";
-import { DEPARTMENTS } from "@/lib/app-context";
+import { DEPARTMENTS, getCurrentOperator } from "@/lib/app-context";
 
 function utilizationColor(
   currentPct: number,
@@ -64,6 +64,25 @@ export default function DashboardPage() {
   const month = now.getMonth();
 
   const [tick, setTick] = useState(0);
+  const operator = getCurrentOperator();
+  const columnOrderKey = `lgc:dashboard-column-order:${operator.email.toLowerCase()}`;
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => {
+    try {
+      const stored = window.localStorage.getItem(columnOrderKey);
+      return stored ? (JSON.parse(stored) as string[]) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [draggedDepartment, setDraggedDepartment] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(columnOrderKey, JSON.stringify(columnOrder));
+    } catch {
+      // Keep the dashboard usable when browser storage is unavailable.
+    }
+  }, [columnOrder, columnOrderKey]);
 
   useEffect(() => {
     document.body.classList.add("bg-black");
@@ -172,6 +191,12 @@ export default function DashboardPage() {
       );
     }
     return Array.from(grouped.entries()).sort(([a], [b]) => {
+      const aOrder = columnOrder.indexOf(a);
+      const bOrder = columnOrder.indexOf(b);
+      if (aOrder >= 0 || bOrder >= 0) {
+        return (aOrder < 0 ? Number.MAX_SAFE_INTEGER : aOrder) -
+          (bOrder < 0 ? Number.MAX_SAFE_INTEGER : bOrder);
+      }
       const aIndex = DEPARTMENTS.indexOf(a as (typeof DEPARTMENTS)[number]);
       const bIndex = DEPARTMENTS.indexOf(b as (typeof DEPARTMENTS)[number]);
       if (a === "Unassigned") return 1;
@@ -179,7 +204,36 @@ export default function DashboardPage() {
       return (aIndex < 0 ? DEPARTMENTS.length : aIndex) -
         (bIndex < 0 ? DEPARTMENTS.length : bIndex);
     });
-  }, [sessionsQuery.data]);
+  }, [sessionsQuery.data, columnOrder]);
+
+  function moveDepartment(department: string, direction: -1 | 1): void {
+    const departments = activeSessionsByDepartment.map(([name]) => name);
+    const index = departments.indexOf(department);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= departments.length) return;
+    const next = [...departments];
+    [next[index], next[target]] = [next[target], next[index]];
+    setColumnOrder(next);
+  }
+
+  function resetColumnOrder(): void {
+    setColumnOrder([]);
+  }
+
+  function handleDepartmentDrop(event: DragEvent<HTMLElement>, targetDepartment: string): void {
+    event.preventDefault();
+    const sourceDepartment = draggedDepartment;
+    setDraggedDepartment(null);
+    if (!sourceDepartment || sourceDepartment === targetDepartment) return;
+    const departments = activeSessionsByDepartment.map(([name]) => name);
+    const sourceIndex = departments.indexOf(sourceDepartment);
+    const targetIndex = departments.indexOf(targetDepartment);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const next = [...departments];
+    next.splice(sourceIndex, 1);
+    next.splice(targetIndex, 0, sourceDepartment);
+    setColumnOrder(next);
+  }
 
   if (loading) {
     return (
@@ -408,15 +462,61 @@ export default function DashboardPage() {
                 No active or stopped sessions.
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {activeSessionsByDepartment.map(([department, departmentSessions]) => (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-neutral-500">
+                    Drag a department header or use the arrow buttons to reorganize your columns.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={resetColumnOrder}
+                    className="inline-flex items-center gap-1 rounded-md border border-neutral-700 px-2.5 py-1.5 text-xs font-semibold text-neutral-300 transition-colors hover:bg-neutral-800 hover:text-white"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Reset order
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {activeSessionsByDepartment.map(([department, departmentSessions], index) => (
                   <section
                     key={department}
-                    className="min-w-0 overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950"
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => handleDepartmentDrop(event, department)}
+                    className={`min-w-0 overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950 ${
+                      draggedDepartment === department ? "border-brand-lead" : ""
+                    }`}
                   >
-                    <h3 className="border-b border-neutral-800 bg-neutral-900 px-4 py-3 font-semibold capitalize text-neutral-100">
-                      {department}
-                    </h3>
+                    <div
+                      draggable
+                      onDragStart={() => setDraggedDepartment(department)}
+                      onDragEnd={() => setDraggedDepartment(null)}
+                      className="flex cursor-grab items-center gap-2 border-b border-neutral-800 bg-neutral-900 px-3 py-3 active:cursor-grabbing"
+                    >
+                      <GripVertical className="h-4 w-4 shrink-0 text-neutral-500" />
+                      <h3 className="min-w-0 flex-1 truncate font-semibold capitalize text-neutral-100">
+                        {department}
+                      </h3>
+                      <button
+                        type="button"
+                        title="Move department left"
+                        aria-label={`Move ${department} left`}
+                        disabled={index === 0}
+                        onClick={() => moveDepartment(department, -1)}
+                        className="rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        title="Move department right"
+                        aria-label={`Move ${department} right`}
+                        disabled={index === activeSessionsByDepartment.length - 1}
+                        onClick={() => moveDepartment(department, 1)}
+                        className="rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
                     <div className="h-[420px] overflow-y-auto">
                       <div className="divide-y divide-neutral-800">
                         {departmentSessions.map((s) => {
@@ -443,7 +543,12 @@ export default function DashboardPage() {
                                 <dt className="text-neutral-500">Operator</dt>
                                 <dd className="truncate text-right text-neutral-200">{s.OperatorName ?? "—"}</dd>
                                 <dt className="text-neutral-500">Material</dt>
-                                <dd className="truncate text-right font-mono text-neutral-200">{s.MaterialNumber}</dd>
+                                <dd className="min-w-0 text-right text-neutral-200">
+                                  <div className="truncate font-mono">{s.MaterialNumber}</div>
+                                  {s.MaterialDescription && (
+                                    <div className="truncate text-xs text-neutral-500">{s.MaterialDescription}</div>
+                                  )}
+                                </dd>
                                 <dt className="text-neutral-500">Batch</dt>
                                 <dd className="truncate text-right font-mono text-neutral-200">{s.BatchNumber}</dd>
                                 <dt className="text-neutral-500">Duration</dt>
@@ -462,6 +567,7 @@ export default function DashboardPage() {
                     </div>
                   </section>
                 ))}
+                </div>
               </div>
             )}
           </section>
