@@ -301,7 +301,7 @@ export default function OperatorPage() {
       await MaterialBatchSessionService.update(open.ID, {
         StopTime: stopTime,
         DurationSeconds: duration,
-        SessionStatus: "Completed",
+        SessionStatus: "Paused",
       });
       const newTotal = (job.TotalSeconds ?? 0) + duration;
       await MaterialBatchJobService.update(job.ID, {

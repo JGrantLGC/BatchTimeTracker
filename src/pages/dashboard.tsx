@@ -412,7 +412,7 @@ export default function DashboardPage() {
                         Current Sessions
                       </th>
                       <th className="text-center px-4 py-3 font-semibold text-neutral-300">
-                        Completed Sessions
+                        Paused Sessions
                       </th>
                       <th className="text-right px-4 py-3 font-semibold text-neutral-300">
                         Total Time

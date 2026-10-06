@@ -1,4 +1,4 @@
-export type SessionStatus = "Running" | "Completed" | "ClosedByEnd";
+export type SessionStatus = "Running" | "Paused" | "ClosedByEnd";
 
 export interface MaterialBatchSession {
   ID: string;

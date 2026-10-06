@@ -135,7 +135,7 @@
    await MaterialBatchSessionService.update(open.ID, {
      StopTime: stopTime,
      DurationSeconds: duration,
-     SessionStatus: "Completed",
+     SessionStatus: "Paused",
    });
    const newTotal = (job.TotalSeconds ?? 0) + duration;
    await MaterialBatchJobService.update(job.ID, {
@@ -300,7 +300,7 @@
            `total=${job?.TotalSeconds} expected=${duration}`,
          );
          const sessions = await findSessionsForJobKey(jobKey);
-         assert(a, "Session is Completed", sessions[0].SessionStatus === "Completed");
+         assert(a, "Session is Paused", sessions[0].SessionStatus === "Paused");
          assert(a, "Session has StopTime", !!sessions[0].StopTime);
          assert(
            a,
@@ -357,12 +357,12 @@
            sessionSum === (job?.TotalSeconds ?? -1),
            `sessionsSum=${sessionSum} total=${job?.TotalSeconds}`,
          );
-         const completed = sessions.filter((s) => s.SessionStatus === "Completed");
+         const paused = sessions.filter((s) => s.SessionStatus === "Paused");
          assert(
            a,
-           "Exactly 3 Completed sessions",
-           completed.length === 3,
-           `completed=${completed.length}`,
+           "Exactly 3 Paused sessions",
+           paused.length === 3,
+           `paused=${paused.length}`,
          );
          const running = sessions.filter((s) => s.SessionStatus === "Running");
          assert(a, "Zero Running sessions", running.length === 0);
@@ -423,8 +423,8 @@
          const stopDur = await doStop(jobKey);
          await doStart(jobKey, "TEST-MAT-A", "TEST-BATCH-A", "Test Material A", jobKey);
          await sleep(1100);
-         const priorCompleted = (await findSessionsForJobKey(jobKey)).filter(
-           (s) => s.SessionStatus === "Completed",
+         const priorPaused = (await findSessionsForJobKey(jobKey)).filter(
+           (s) => s.SessionStatus === "Paused",
          ).length;
          const { finalTotal, closedByEnd } = await doEnd(jobKey);
          assert(a, "End reported exactly 1 session closed", closedByEnd === 1);
@@ -439,14 +439,14 @@
            closedByEndCount === 1,
            `closedByEnd=${closedByEndCount}`,
          );
-         const completedNow = sessions.filter(
-           (s) => s.SessionStatus === "Completed",
+         const pausedNow = sessions.filter(
+           (s) => s.SessionStatus === "Paused",
          ).length;
          assert(
            a,
-           "Completed session count unchanged",
-           completedNow === priorCompleted,
-           `before=${priorCompleted} after=${completedNow}`,
+           "Paused session count unchanged",
+           pausedNow === priorPaused,
+           `before=${priorPaused} after=${pausedNow}`,
          );
          const running = sessions.filter((s) => s.SessionStatus === "Running");
          assert(a, "No Running sessions remain", running.length === 0);
