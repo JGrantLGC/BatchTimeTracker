@@ -4,6 +4,7 @@ import { getSupabase } from "@/lib/supabase-client";
 export interface UtilizationSettings {
   targetUtilizationPercent: number;
   totalMonthlyHours: number;
+  settingsMonth: string | null;
 }
 
 export interface BusinessDayEntry {
@@ -17,14 +18,15 @@ export async function fetchUtilizationSettings(): Promise<UtilizationSettings> {
   const sb = getSupabase();
   const { data, error } = await sb
     .from("utilization_settings")
-    .select("target_utilization_percent, total_monthly_hours")
+    .select("target_utilization_percent, total_monthly_hours, settings_month")
     .eq("id", "current")
     .maybeSingle();
   if (error) throw new Error(reportDbError("Failed to load utilization settings", error));
-  if (!data) return { targetUtilizationPercent: 85, totalMonthlyHours: 0 };
+  if (!data) return { targetUtilizationPercent: 85, totalMonthlyHours: 0, settingsMonth: null };
   return {
     targetUtilizationPercent: Number(data.target_utilization_percent) || 85,
     totalMonthlyHours: Number(data.total_monthly_hours) || 0,
+    settingsMonth: (data.settings_month as string | null) ?? null,
   };
 }
 
@@ -34,10 +36,12 @@ export async function saveUtilizationSettings(
   userId?: string,
 ): Promise<void> {
   const sb = getSupabase();
+  const settingsMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
   const payload = {
     id: "current",
     target_utilization_percent: targetPercent,
     total_monthly_hours: totalMonthlyHours,
+    settings_month: settingsMonth,
     updated_at: new Date().toISOString(),
     updated_by: userId ?? null,
   };
@@ -65,6 +69,16 @@ export async function fetchBusinessDayCalendar(
     isBusinessDay: Boolean(r.is_business_day),
     label: r.label as string | null,
   }));
+}
+
+export async function autoGenerateBusinessDays(year: number, month: number): Promise<number> {
+  const sb = getSupabase();
+  const { data, error } = await sb.rpc("auto_generate_business_days", {
+    p_year: year,
+    p_month: month,
+  });
+  if (error) throw new Error(reportDbError("Failed to auto-generate business days", error));
+  return typeof data === "number" ? data : 0;
 }
 
 export async function upsertBusinessDay(

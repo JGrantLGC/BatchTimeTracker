@@ -1,12 +1,13 @@
 import { useMemo, useEffect, useState, type DragEvent } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Loader2, ArrowLeft, ChevronLeft, ChevronRight, GripVertical, RotateCcw } from "lucide-react";
+import { Loader2, ArrowLeft, ChevronLeft, ChevronRight, GripVertical, RotateCcw, AlertTriangle } from "lucide-react";
 import { MaterialBatchSessionService } from "@/api/services/MaterialBatchSessionService";
 import type { MaterialBatchSession } from "@/api/models/MaterialBatchSession";
 import {
   fetchUtilizationSettings,
   fetchBusinessDayCalendar,
+  autoGenerateBusinessDays,
   calculateUtilization,
   getMonthName,
 } from "@/lib/utilization";
@@ -60,6 +61,7 @@ function liveDurationSeconds(startTime: string): number {
 }
 
 export default function DashboardPage() {
+  const queryClient = useQueryClient();
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -111,6 +113,29 @@ export default function DashboardPage() {
     refetchInterval: REFRESH_INTERVAL_MS,
     refetchIntervalInBackground: true,
   });
+
+  // Auto-generate business day rows when the calendar comes back empty for the current month.
+  useEffect(() => {
+    if (calendarQuery.data === undefined) return;
+    if (calendarQuery.data.length > 0) return;
+    let cancelled = false;
+    autoGenerateBusinessDays(year, month)
+      .then(() => {
+        if (!cancelled) {
+          queryClient.invalidateQueries({ queryKey: ["business-day-calendar", year, month] });
+        }
+      })
+      .catch(() => {
+        // Non-fatal — the dashboard will show zeros but won't crash.
+      });
+    return () => { cancelled = true; };
+  }, [calendarQuery.data, year, month, queryClient]);
+
+  const settingsMonthStale = useMemo(() => {
+    if (!settingsQuery.data?.settingsMonth) return false;
+    const currentKey = `${year}-${String(month + 1).padStart(2, "0")}`;
+    return settingsQuery.data.settingsMonth !== currentKey;
+  }, [settingsQuery.data, year, month]);
 
   const loading =
     settingsQuery.isLoading || calendarQuery.isLoading || sessionsQuery.isLoading;
@@ -307,6 +332,17 @@ export default function DashboardPage() {
           </div>
         </div>
       </header>
+
+      {settingsMonthStale && (
+        <div className="shrink-0 border-b border-status-stopped/30 bg-status-stopped/10">
+          <div className="mx-auto w-full max-w-7xl px-4 md:px-8 py-2.5 flex items-center gap-2 text-sm text-status-stopped">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>
+              Total Monthly Hours was last updated for a prior month. Ask Admin to Please Update Total Monthly Hours.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Fixed top section: utilization display */}
       <div className="shrink-0 border-b border-neutral-800 bg-neutral-950">
