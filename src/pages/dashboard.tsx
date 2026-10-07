@@ -385,7 +385,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Prominent utilization number */}
-            <div className="flex-1 text-center md:text-center">
+            <div className="text-center md:text-center">
               <div className="flex items-center gap-3 justify-center md:justify-center">
                 <span className="text-5xl md:text-7xl font-bold tracking-tight tabular-nums">
                   <span className={colors.text}>{currentPct.toFixed(1)}%</span>
