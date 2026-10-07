@@ -308,7 +308,7 @@ export default function DashboardPage() {
       {/* Branded header */}
       <header className="border-b border-neutral-800 bg-brand-lead text-white shadow-sm relative overflow-hidden">
         <BrandHexPattern className="absolute inset-0 h-full w-full text-white opacity-25" />
-        <div className="relative mx-auto w-full max-w-7xl px-4 md:px-8 h-[100px] flex items-center gap-4">
+        <div className="relative mx-auto w-full max-w-[2200px] px-4 md:px-8 h-[100px] flex items-center gap-4">
           <div className="flex items-center gap-4">
             <LGCLogo variant="reversed" className="h-14 md:h-16 w-auto" />
             <div className="hidden md:block h-12 w-px bg-white/30" aria-hidden="true" />
@@ -335,7 +335,7 @@ export default function DashboardPage() {
 
       {settingsMonthStale && (
         <div className="shrink-0 border-b border-status-stopped/30 bg-status-stopped/10">
-          <div className="mx-auto w-full max-w-7xl px-4 md:px-8 py-2.5 flex items-center gap-2 text-sm text-status-stopped">
+          <div className="mx-auto w-full max-w-[2200px] px-4 md:px-8 py-2.5 flex items-center gap-2 text-sm text-status-stopped">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             <span>
               Total Monthly Hours was last updated for a prior month. Ask Admin to Please Update Total Monthly Hours.
@@ -346,7 +346,7 @@ export default function DashboardPage() {
 
       {/* Fixed top section: utilization display */}
       <div className="shrink-0 border-b border-neutral-800 bg-neutral-950">
-        <div className="mx-auto w-full max-w-7xl px-4 md:px-8 py-6 md:py-8">
+        <div className="mx-auto w-full max-w-[2200px] px-4 md:px-8 py-6 md:py-8">
           <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10">
             {/* Dial indicator */}
             <div className="relative shrink-0">
@@ -433,7 +433,7 @@ export default function DashboardPage() {
 
       {/* Scrollable sessions section */}
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-7xl px-4 md:px-8 py-6 space-y-8">
+        <div className="mx-auto w-full max-w-[2200px] px-4 md:px-8 py-6 space-y-8">
           {/* Department totals */}
           <section>
             <h2 className="text-lg font-bold tracking-tight mb-1 text-neutral-100">
@@ -521,7 +521,7 @@ export default function DashboardPage() {
                     Reset order
                   </button>
                 </div>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5">
                 {activeSessionsByDepartment.map(([department, departmentSessions], index) => (
                   <section
                     key={department}
