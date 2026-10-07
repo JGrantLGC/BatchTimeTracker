@@ -7,7 +7,7 @@ const OPERATOR_KEY = "currentOperator";
 const SAP_REFRESH_KEY = "lastSAPRefresh";
 const AUTHORIZED_USERS_KEY = "authorizedUsers";
 export function getBarcodeDelimiter(): string {
-  return memory.ensure<string>(DELIMITER_KEY, () => "|");
+  return memory.ensure<string>(DELIMITER_KEY, () => " ");
 }
 export function setBarcodeDelimiter(value: string) { memory.put(DELIMITER_KEY, value); }
 export function getCurrentOperator(): Operator {

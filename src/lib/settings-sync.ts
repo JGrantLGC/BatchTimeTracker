@@ -34,7 +34,7 @@ export async function loadSettingsFromSupabase(): Promise<void> {
     .maybeSingle();
   if (error || !data) return;
   const row = mapRow(data);
-  setBarcodeDelimiter(row.barcode_delimiter || "|");
+  setBarcodeDelimiter(row.barcode_delimiter || " ");
   if (Array.isArray(row.authorized_users)) {
     setAuthorizedUsers(row.authorized_users);
   }

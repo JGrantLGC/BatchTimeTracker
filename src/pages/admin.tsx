@@ -269,7 +269,7 @@ export default function AdminPage() {
   }
   async function saveSettings() {
     setSettingsMessage(null);
-    setBarcodeDelimiter(delimiter || "|");
+    setBarcodeDelimiter(delimiter || " ");
     setAuthorizedUsers(
       authorized
         .split(/[\s,]+/)
@@ -581,7 +581,7 @@ export default function AdminPage() {
               id="delim"
               value={delimiter}
               onChange={(e) => setDelim(e.target.value)}
-              placeholder="|"
+              placeholder=" "
               className="font-mono"
             />
             <p className="text-xs text-muted-foreground">

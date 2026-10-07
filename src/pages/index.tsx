@@ -72,6 +72,7 @@ export default function OperatorPage() {
   const [editSession, setEditSession] = useState<MaterialBatchSession | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const scannerInputRef = useRef<HTMLInputElement>(null);
+  const scannerTimingRef = useRef<{ lastTime: number; lastLength: number; isScanning: boolean }>({ lastTime: 0, lastLength: 0, isScanning: false });
   const operator = getCurrentOperator();
   // Fetch derived job for the resolved JobKey
   const jobQuery = useQuery({
@@ -475,14 +476,32 @@ export default function OperatorPage() {
             id="scanner-input"
             ref={scannerInputRef}
             value={rawInput}
-            onChange={(e) => setRawInput(e.target.value)}
+            onChange={(e) => {
+              const now = performance.now();
+              const timing = scannerTimingRef.current;
+              if (timing.lastTime > 0 && now - timing.lastTime < 15 && e.target.value.length > timing.lastLength) {
+                timing.isScanning = true;
+              } else if (now - timing.lastTime > 500) {
+                timing.isScanning = false;
+              }
+              timing.lastTime = now;
+              timing.lastLength = e.target.value.length;
+              setRawInput(e.target.value);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                processBarcode(rawInput);
+                const timing = scannerTimingRef.current;
+                if (timing.isScanning) {
+                  processBarcode(rawInput);
+                  timing.isScanning = false;
+                  timing.lastTime = 0;
+                } else {
+                  processBarcode(rawInput);
+                }
               }
             }}
-            placeholder="e.g. 68-000018|10643441A"
+            placeholder="e.g. 7500-0000 10643441"
             className="h-14 md:h-16 text-lg md:text-xl tracking-wider font-mono"
             aria-label="Scan or type barcode"
             autoComplete="off"
@@ -812,12 +831,12 @@ export default function OperatorPage() {
           </DialogHeader>
           <div className="grid grid-cols-1 gap-2 text-sm">
             {[
-              "68-000018|10643441A",
-              "72-100001|10643441A",
-              "00045678|BATCH-2025-09-24",
-              "0100-0013|10643441A",
-              "V-104AB|X-002",
-              "68-000019|OVER24H",
+              "7500-0000 10643441",
+              "7200-1000 10643441",
+              "00045678 BATCH-2025-09-24",
+              "0100-0013 10643441",
+              "V-104AB X-002",
+              "6800-0019 OVER24H",
             ].map((code) => (
               <Button
                 key={code}
