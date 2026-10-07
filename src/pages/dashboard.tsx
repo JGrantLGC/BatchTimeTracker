@@ -347,7 +347,7 @@ export default function DashboardPage() {
       {/* Fixed top section: utilization display */}
       <div className="shrink-0 border-b border-neutral-800 bg-neutral-950">
         <div className="mx-auto w-full max-w-[2200px] px-4 md:px-8 py-6 md:py-8">
-          <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-10">
             {/* Dial indicator */}
             <div className="relative shrink-0">
               <svg viewBox="0 0 200 200" className="h-40 w-40 md:h-48 md:w-48">
@@ -385,8 +385,8 @@ export default function DashboardPage() {
             </div>
 
             {/* Prominent utilization number */}
-            <div className="flex-1 text-center md:text-left">
-              <div className="flex items-center gap-3 justify-center md:justify-start">
+            <div className="flex-1 text-center md:text-center">
+              <div className="flex items-center gap-3 justify-center md:justify-center">
                 <span className="text-5xl md:text-7xl font-bold tracking-tight tabular-nums">
                   <span className={colors.text}>{currentPct.toFixed(1)}%</span>
                 </span>
@@ -399,7 +399,7 @@ export default function DashboardPage() {
               <p className="mt-2 text-sm text-neutral-400">
                 Current utilization for {getMonthName(month)} {year}
               </p>
-              <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 justify-center md:justify-start text-sm">
+              <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 justify-center md:justify-center text-sm">
                 <span className="text-neutral-400">
                   Target:{" "}
                   <span className="font-semibold text-neutral-100">
