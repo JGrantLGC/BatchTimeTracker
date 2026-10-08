@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { Session } from "@supabase/supabase-js";
 import { ShieldCheck } from "lucide-react";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase-client";
+import { reportDbError } from "@/lib/safe-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -118,18 +119,18 @@ export async function listAdminUsers(): Promise<AdminUser[]> {
     .from("admin_users")
     .select("user_id, email, display_name, created_at")
     .order("created_at", { ascending: true });
-  if (error) throw error;
+  if (error) throw new Error(reportDbError("Unable to load administrator accounts", error));
   return (data ?? []) as AdminUser[];
 }
 
 export async function grantAdminByEmail(email: string): Promise<void> {
   const { error } = await getSupabase().rpc("grant_admin_by_email", { p_email: email });
-  if (error) throw error;
+  if (error) throw new Error(reportDbError("Unable to grant administrator access", error));
 }
 
 export async function revokeAdmin(userId: string): Promise<void> {
   const { error } = await getSupabase().rpc("revoke_admin", { p_user_id: userId });
-  if (error) throw error;
+  if (error) throw new Error(reportDbError("Unable to remove administrator access", error));
 }
 
 function AdminLoginScreen({

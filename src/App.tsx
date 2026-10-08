@@ -36,7 +36,7 @@ function App() {
                   <Route path="admin" element={<AdminGate><AdminPage /></AdminGate>} />
                   <Route path="utilization-settings" element={<AdminGate><UtilizationSettingsPage /></AdminGate>} />
                   <Route path="reports" element={<ReportsPage />} />
-                  <Route path="diagnostics" element={<DiagnosticsPage />} />
+                  <Route path="diagnostics" element={<AdminGate><DiagnosticsPage /></AdminGate>} />
                   <Route path="*" element={<NotFoundPage />} />
                 </Route>
               </Routes>

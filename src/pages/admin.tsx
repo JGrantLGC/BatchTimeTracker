@@ -78,6 +78,7 @@ import {
 } from "@/components/system/AdminAccess";
 import { isSupabaseConfigured, getSupabase, getSupabaseOrNull, getCustomDbConfig, setCustomDbConfig, testCustomDbConnection } from "@/lib/supabase-client";
 import { saveSettingsToSupabase } from "@/lib/settings-sync";
+import { reportDbError } from "@/lib/safe-error";
 
 interface OperatorRecord {
   id: string;
@@ -243,8 +244,7 @@ export default function AdminPage() {
       setNewPassword("");
       setPasswordMessage("Password updated successfully.");
     } catch (cause: unknown) {
-      const message = cause instanceof Error ? cause.message : "";
-      setPasswordMessage(message || "Unable to change password. Please try again.");
+      setPasswordMessage(reportDbError("Unable to change password", cause));
     } finally {
       setPasswordBusy(false);
     }
