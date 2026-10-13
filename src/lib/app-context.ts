@@ -30,3 +30,7 @@ export function isAuthorizedUser(email?: string | null): boolean {
   const lower = email.toLowerCase();
   return getAuthorizedUsers().some((e) => e.toLowerCase() === lower);
 }
+
+export function syncAuthorizedUsersFromOperators(emails: string[]): void {
+  memory.put(AUTHORIZED_USERS_KEY, emails.map((e) => e.toLowerCase()).filter(Boolean));
+}

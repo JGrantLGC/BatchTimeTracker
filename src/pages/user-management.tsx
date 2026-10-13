@@ -9,6 +9,8 @@ import {
   ShieldCheck,
   Shield,
   KeyRound,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   DEPARTMENTS,
+  syncAuthorizedUsersFromOperators,
   type Department,
 } from "@/lib/app-context";
 import {
@@ -39,6 +42,7 @@ interface OperatorRecord {
   email: string | null;
   department: string;
   is_admin: boolean;
+  is_authorized: boolean;
 }
 
 export default function UserManagementPage() {
@@ -82,14 +86,18 @@ export default function UserManagementPage() {
     }
     const { data, error } = await sb
       .from("operators")
-      .select("id, name, email, department, is_admin")
+      .select("id, name, email, department, is_admin, is_authorized")
       .order("name", { ascending: true });
     if (error) {
       setMessage("Unable to load operators.");
       setLoading(false);
       return;
     }
-    setOperators((data ?? []) as OperatorRecord[]);
+    const records = (data ?? []) as OperatorRecord[];
+    setOperators(records);
+    syncAuthorizedUsersFromOperators(
+      records.filter((o) => o.is_authorized && o.email).map((o) => o.email!),
+    );
     setLoading(false);
     setMessage(null);
   }
@@ -129,6 +137,28 @@ export default function UserManagementPage() {
       throw new Error(body.error ?? "Unable to create the account.");
     }
     return true;
+  }
+
+  async function toggleAuthorized(op: OperatorRecord) {
+    const sb = getSupabaseOrNull();
+    if (!sb) return;
+    const { error } = await sb
+      .from("operators")
+      .update({ is_authorized: !op.is_authorized, updated_at: new Date().toISOString() })
+      .eq("id", op.id);
+    if (error) {
+      setMessage(`Failed to update authorized status for ${op.name}.`);
+      return;
+    }
+    setOperators((prev) => {
+      const updated = prev.map((o) =>
+        o.id === op.id ? { ...o, is_authorized: !op.is_authorized } : o,
+      );
+      syncAuthorizedUsersFromOperators(
+        updated.filter((o) => o.is_authorized && o.email).map((o) => o.email!),
+      );
+      return updated;
+    });
   }
 
   async function toggleAdmin(op: OperatorRecord) {
@@ -236,7 +266,7 @@ export default function UserManagementPage() {
       .from("operators")
       .update({ name: trimmedName, email: trimmedEmail, department: editDept, updated_at: new Date().toISOString() })
       .eq("id", editTarget.id)
-      .select("id, name, email, department, is_admin")
+      .select("id, name, email, department, is_admin, is_authorized")
       .single();
     if (error) {
       setEditError(reportDbError("Failed to update operator", error));
@@ -272,7 +302,7 @@ export default function UserManagementPage() {
     const { data, error } = await sb
       .from("operators")
       .insert({ name: trimmed, email: trimmedEmail, department: newDept })
-      .select("id, name, email, department, is_admin")
+      .select("id, name, email, department, is_admin, is_authorized")
       .single();
     if (error) {
       setAddError(reportDbError("Failed to add operator", error));
@@ -350,8 +380,8 @@ export default function UserManagementPage() {
           User Management
         </h1>
         <p className="text-muted-foreground text-sm">
-          Add, edit, and delete operators. Toggle administrator access with the
-          radio buttons.
+          Add, edit, and delete operators. Toggle administrator and authorized
+          user access with the radio buttons.
         </p>
       </div>
 
@@ -376,6 +406,7 @@ export default function UserManagementPage() {
               <th className="text-left px-4 py-3 font-semibold">Email</th>
               <th className="text-left px-4 py-3 font-semibold">Department</th>
               <th className="text-center px-4 py-3 font-semibold">Admin</th>
+              <th className="text-center px-4 py-3 font-semibold">Authorized</th>
               <th className="text-right px-4 py-3 font-semibold">Actions</th>
             </tr>
           </thead>
@@ -425,6 +456,30 @@ export default function UserManagementPage() {
                     </label>
                   </div>
                 </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-center gap-3">
+                    <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        name={`auth-${op.id}`}
+                        checked={op.is_authorized}
+                        onChange={() => void toggleAuthorized(op)}
+                        className="h-4 w-4 accent-brand-lead"
+                      />
+                      <CheckCircle2 className="h-4 w-4 text-brand-lead" />
+                    </label>
+                    <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        name={`auth-${op.id}`}
+                        checked={!op.is_authorized}
+                        onChange={() => void toggleAuthorized(op)}
+                        className="h-4 w-4"
+                      />
+                      <Circle className="h-4 w-4 text-muted-foreground" />
+                    </label>
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">
                   <button
                     type="button"
@@ -449,7 +504,7 @@ export default function UserManagementPage() {
             {filtered.length === 0 && (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="text-center px-4 py-8 text-muted-foreground"
                 >
                   {search.trim() ? "No matches." : "No operators yet."}

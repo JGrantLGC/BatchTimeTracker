@@ -34,9 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  getAuthorizedUsers,
   getBarcodeDelimiter,
-  setAuthorizedUsers,
   setBarcodeDelimiter,
   setLastSAPRefresh,
 } from "@/lib/app-context";
@@ -77,7 +75,6 @@ export default function AdminPage() {
   const { session } = useAdminAccess();
   const [search, setSearch] = useState("");
   const [delimiter, setDelim] = useState(getBarcodeDelimiter());
-  const [authorized, setAuthorized] = useState(getAuthorizedUsers().join(", "));
   const [dataSource, setDataSource] = useState<DataSourceType>(getDataSourceType());
   const [newPassword, setNewPassword] = useState("");
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
@@ -193,12 +190,6 @@ export default function AdminPage() {
   async function saveSettings() {
     setSettingsMessage(null);
     setBarcodeDelimiter(delimiter || " ");
-    setAuthorizedUsers(
-      authorized
-        .split(/[\s,]+/)
-        .map((s) => s.trim())
-        .filter(Boolean),
-    );
     if (customDbUrl.trim() && customDbKey.trim()) {
       setCustomDbConfig(customDbUrl, customDbKey);
     }
@@ -511,25 +502,13 @@ export default function AdminPage() {
               Splits MaterialNumber from BatchNumber. Default: <span className="font-mono">|</span>.
             </p>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="auth">Authorized Users (emails)</Label>
-            <Input
-              id="auth"
-              value={authorized}
-              onChange={(e) => setAuthorized(e.target.value)}
-              placeholder="alice@lgcgroup.com, bob@lgcgroup.com"
-            />
-            <p className="text-xs text-muted-foreground">
-              Comma-separated. Authorized users can Stop or End another operator's Running job.
-            </p>
-          </div>
           {supabaseReady && (
           <Link
             to="/user-management"
             className="inline-flex items-center gap-2 rounded-lg border bg-card px-4 py-3 text-sm font-medium transition-colors hover:bg-muted"
           >
             <Users className="h-5 w-5 text-brand-lead" />
-            <span>User Management — manage operators, departments, and administrator access</span>
+            <span>User Management — manage operators, departments, administrator and authorized user access</span>
           </Link>
           )}
           {supabaseReady && (

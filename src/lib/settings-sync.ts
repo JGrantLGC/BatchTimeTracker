@@ -35,10 +35,22 @@ export async function loadSettingsFromSupabase(): Promise<void> {
   if (error || !data) return;
   const row = mapRow(data);
   setBarcodeDelimiter(row.barcode_delimiter || " ");
-  if (Array.isArray(row.authorized_users)) {
+  setDataSourceType(row.data_source || "local");
+
+  // Also sync authorized users from the operators table (is_authorized flag)
+  const { data: opData } = await sb
+    .from("operators")
+    .select("email, is_authorized")
+    .eq("is_authorized", true);
+  if (opData && opData.length > 0) {
+    setAuthorizedUsers(
+      opData
+        .map((o: { email: string }) => o.email)
+        .filter(Boolean),
+    );
+  } else if (Array.isArray(row.authorized_users)) {
     setAuthorizedUsers(row.authorized_users);
   }
-  setDataSourceType(row.data_source || "local");
 }
 
 export async function saveSettingsToSupabase(updaterEmail?: string): Promise<void> {
