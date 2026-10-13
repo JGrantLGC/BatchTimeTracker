@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Download,
@@ -12,8 +12,6 @@ import {
   FileSpreadsheet,
   Loader2,
   CheckCircle2,
-  UserPlus,
-  UserMinus,
   KeyRound,
   Gauge,
   Pencil,
@@ -41,8 +39,6 @@ import {
   setAuthorizedUsers,
   setBarcodeDelimiter,
   setLastSAPRefresh,
-  DEPARTMENTS,
-  type Department,
 } from "@/lib/app-context";
 import {
   getDataSourceType,
@@ -70,31 +66,19 @@ import {
   type MaterialCatalogEntry,
 } from "@/lib/material-catalog";
 import {
-  grantAdminByEmail,
-  listAdminUsers,
-  revokeAdmin,
   useAdminAccess,
-  type AdminUser,
 } from "@/components/system/AdminAccess";
-import { isSupabaseConfigured, getSupabase, getSupabaseOrNull, getCustomDbConfig, setCustomDbConfig, testCustomDbConnection } from "@/lib/supabase-client";
+import { isSupabaseConfigured, getSupabase, getCustomDbConfig, setCustomDbConfig, testCustomDbConnection } from "@/lib/supabase-client";
 import { saveSettingsToSupabase } from "@/lib/settings-sync";
 import { reportDbError } from "@/lib/safe-error";
 
-interface OperatorRecord {
-  id: string;
-  name: string;
-  department: string;
-}
 export default function AdminPage() {
   const queryClient = useQueryClient();
-  const { session, refreshAdminStatus } = useAdminAccess();
+  const { session } = useAdminAccess();
   const [search, setSearch] = useState("");
   const [delimiter, setDelim] = useState(getBarcodeDelimiter());
   const [authorized, setAuthorized] = useState(getAuthorizedUsers().join(", "));
   const [dataSource, setDataSource] = useState<DataSourceType>(getDataSourceType());
-  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
-  const [newAdminEmail, setNewAdminEmail] = useState("");
-  const [adminMessage, setAdminMessage] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [passwordBusy, setPasswordBusy] = useState(false);
@@ -150,20 +134,9 @@ export default function AdminPage() {
   const [testStatus, setTestStatus] = useState<{ ok: boolean; message: string } | null>(null);
   const [testing, setTesting] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
-  const [operatorRecords, setOperatorRecords] = useState<OperatorRecord[]>([]);
-  const [operatorMessage, setOperatorMessage] = useState<string | null>(null);
-  const [operatorSearch, setOperatorSearch] = useState("");
   const [editMode, setEditMode] = useState<EditMode>("edit");
   const [editSession, setEditSession] = useState<MaterialBatchSession | null>(null);
   const [editOpen, setEditOpen] = useState(false);
-  useEffect(() => {
-    if (!supabaseReady) return;
-    listAdminUsers().then(setAdminUsers).catch(() => setAdminMessage("Unable to load administrator accounts."));
-  }, [supabaseReady]);
-  useEffect(() => {
-    if (!supabaseReady) return;
-    loadOperatorRecords();
-  }, [supabaseReady]);
 
   const editSessionMutation = useMutation({
     mutationFn: async (vars: { id: string; durationSeconds: number }) => {
@@ -187,47 +160,6 @@ export default function AdminPage() {
     },
   });
 
-  async function loadOperatorRecords() {
-    const sb = getSupabaseOrNull();
-    if (!sb) return;
-    const { data, error } = await sb
-      .from("operators")
-      .select("id, name, department")
-      .order("name", { ascending: true });
-    if (error) {
-      setOperatorMessage("Unable to load operator records.");
-      return;
-    }
-    setOperatorRecords((data ?? []) as OperatorRecord[]);
-    setOperatorMessage(null);
-  }
-
-  async function updateOperatorDepartment(id: string, name: string, newDept: Department) {
-    const sb = getSupabaseOrNull();
-    if (!sb) return;
-    setOperatorMessage(null);
-    const { error } = await sb
-      .from("operators")
-      .update({ department: newDept, updated_at: new Date().toISOString() })
-      .eq("id", id);
-    if (error) {
-      setOperatorMessage("Failed to update operator department.");
-      return;
-    }
-    await loadOperatorRecords();
-    setOperatorMessage(`Updated ${name}'s department to ${newDept}.`);
-  }
-  async function addAdministrator() {
-    setAdminMessage(null);
-    try {
-      await grantAdminByEmail(newAdminEmail);
-      setNewAdminEmail("");
-      setAdminUsers(await listAdminUsers());
-      setAdminMessage("Administrator access granted.");
-    } catch {
-      setAdminMessage("That account could not be granted administrator access. Make sure it has signed up first.");
-    }
-  }
   async function changePassword() {
     setPasswordMessage(null);
     if (
@@ -249,17 +181,6 @@ export default function AdminPage() {
       setPasswordMessage(reportDbError("Unable to change password", cause));
     } finally {
       setPasswordBusy(false);
-    }
-  }
-  async function removeAdministrator(userId: string) {
-    setAdminMessage(null);
-    try {
-      await revokeAdmin(userId);
-      setAdminUsers(await listAdminUsers());
-      await refreshAdminStatus();
-      setAdminMessage("Administrator access removed.");
-    } catch {
-      setAdminMessage("You cannot remove your own administrator access.");
     }
   }
   async function testConnection() {
@@ -603,86 +524,13 @@ export default function AdminPage() {
             </p>
           </div>
           {supabaseReady && (
-          <div className="space-y-3 rounded-lg border p-4">
-            <div>
-              <h2 className="font-semibold">Operator departments</h2>
-              <p className="text-sm text-muted-foreground">
-                View and change the department assigned to each operator. Departments are used to filter sessions in reports.
-              </p>
-            </div>
-            <Input
-              placeholder="Search operator name…"
-              value={operatorSearch}
-              onChange={(e) => setOperatorSearch(e.target.value)}
-              className="max-w-sm"
-            />
-            <div className="divide-y rounded-md border max-h-72 overflow-y-auto">
-              {operatorRecords
-                .filter((op) => op.name.toLowerCase().includes(operatorSearch.trim().toLowerCase()))
-                .map((op) => (
-                  <div key={op.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                    <div className="min-0 flex-1 truncate font-medium">{op.name}</div>
-                    <select
-                      value={op.department}
-                      onChange={(e) => void updateOperatorDepartment(op.id, op.name, e.target.value as Department)}
-                      className="border rounded-md h-9 px-2 text-sm bg-transparent"
-                    >
-                      {DEPARTMENTS.map((d) => (
-                        <option key={d} value={d}>
-                          {d.charAt(0).toUpperCase() + d.slice(1)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
-              {operatorRecords.filter((op) => op.name.toLowerCase().includes(operatorSearch.trim().toLowerCase())).length === 0 && (
-                <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                  No operators found.
-                </div>
-              )}
-            </div>
-            {operatorMessage && <p role="status" className="text-sm text-muted-foreground">{operatorMessage}</p>}
-          </div>
-          )}
-          {supabaseReady && (
-          <div className="space-y-3 rounded-lg border p-4">
-            <div>
-              <h2 className="font-semibold">Administrator access</h2>
-              <p className="text-sm text-muted-foreground">
-                Add accounts that have already signed up, or remove access from someone who no longer needs it.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input
-                type="email"
-                value={newAdminEmail}
-                onChange={(event) => setNewAdminEmail(event.target.value)}
-                placeholder="administrator@example.com"
-                aria-label="New administrator email"
-              />
-              <Button onClick={() => void addAdministrator()} disabled={!newAdminEmail.trim()}>
-                <UserPlus className="mr-1 h-4 w-4" />
-                Grant access
-              </Button>
-            </div>
-            <div className="divide-y rounded-md border">
-              {adminUsers.map((admin) => (
-                <div key={admin.user_id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{admin.display_name}</div>
-                    <div className="truncate text-xs text-muted-foreground">{admin.email}</div>
-                  </div>
-                  {admin.user_id !== session?.user.id && (
-                    <Button variant="outline" size="sm" onClick={() => void removeAdministrator(admin.user_id)}>
-                      <UserMinus className="mr-1 h-4 w-4" />
-                      Remove
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-            {adminMessage && <p role="status" className="text-sm text-muted-foreground">{adminMessage}</p>}
-          </div>
+          <Link
+            to="/user-management"
+            className="inline-flex items-center gap-2 rounded-lg border bg-card px-4 py-3 text-sm font-medium transition-colors hover:bg-muted"
+          >
+            <Users className="h-5 w-5 text-brand-lead" />
+            <span>User Management — manage operators, departments, and administrator access</span>
+          </Link>
           )}
           {supabaseReady && (
           <div className="space-y-3 rounded-lg border p-4">

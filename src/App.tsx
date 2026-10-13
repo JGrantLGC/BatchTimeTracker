@@ -11,6 +11,7 @@ import UtilizationSettingsPage from "./pages/utilization-settings";
 import { AdminGate } from "./components/system/AdminAccess";
 import ReportsPage from "./pages/reports";
 import DiagnosticsPage from "./pages/diagnostics";
+import UserManagementPage from "./pages/user-management";
 import NotFoundPage from "./pages/not-found";
 import { AppErrorBoundary } from "./components/system/AppErrorBoundary";
 const isDevMode = import.meta.env.DEV;
@@ -37,6 +38,7 @@ function App() {
                   <Route path="utilization-settings" element={<AdminGate><UtilizationSettingsPage /></AdminGate>} />
                   <Route path="reports" element={<ReportsPage />} />
                   <Route path="diagnostics" element={<AdminGate><DiagnosticsPage /></AdminGate>} />
+                  <Route path="user-management" element={<AdminGate><UserManagementPage /></AdminGate>} />
                   <Route path="*" element={<NotFoundPage />} />
                 </Route>
               </Routes>
