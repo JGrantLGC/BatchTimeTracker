@@ -5,6 +5,7 @@ import {
   Loader2,
   Plus,
   Trash2,
+  Pencil,
   ShieldCheck,
   Shield,
   KeyRound,
@@ -56,6 +57,14 @@ export default function UserManagementPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<OperatorRecord | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+
+  // Edit operator dialog
+  const [editTarget, setEditTarget] = useState<OperatorRecord | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editDept, setEditDept] = useState<Department>("filling");
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   // Password prompt for creating an auth account when granting admin
   const [pwTarget, setPwTarget] = useState<OperatorRecord | null>(null);
@@ -194,6 +203,52 @@ export default function UserManagementPage() {
     } finally {
       setPwBusy(false);
     }
+  }
+
+  function openEditDialog(op: OperatorRecord) {
+    setEditTarget(op);
+    setEditName(op.name);
+    setEditEmail(op.email ?? "");
+    setEditDept(op.department as Department);
+    setEditError(null);
+  }
+
+  async function handleEditSave() {
+    if (!editTarget) return;
+    setEditError(null);
+    const trimmedName = editName.trim();
+    const trimmedEmail = editEmail.trim().toLowerCase();
+    if (!trimmedName) {
+      setEditError("Enter an operator name.");
+      return;
+    }
+    if (!trimmedEmail || !trimmedEmail.includes("@")) {
+      setEditError("Enter a valid email address.");
+      return;
+    }
+    const sb = getSupabaseOrNull();
+    if (!sb) {
+      setEditError("Database is not available.");
+      return;
+    }
+    setEditBusy(true);
+    const { data, error } = await sb
+      .from("operators")
+      .update({ name: trimmedName, email: trimmedEmail, department: editDept, updated_at: new Date().toISOString() })
+      .eq("id", editTarget.id)
+      .select("id, name, email, department, is_admin")
+      .single();
+    if (error) {
+      setEditError(reportDbError("Failed to update operator", error));
+      setEditBusy(false);
+      return;
+    }
+    setOperators((prev) =>
+      [...prev.filter((o) => o.id !== editTarget.id), data as OperatorRecord].sort((a, b) => a.name.localeCompare(b.name)),
+    );
+    setMessage(`Updated ${trimmedName}.`);
+    setEditTarget(null);
+    setEditBusy(false);
   }
 
   async function handleAdd() {
@@ -370,7 +425,15 @@ export default function UserManagementPage() {
                     </label>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-4 py-3 text-right whitespace-nowrap">
+                  <button
+                    type="button"
+                    title="Edit operator"
+                    onClick={() => openEditDialog(op)}
+                    className="inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
                   <button
                     type="button"
                     title="Delete operator"
@@ -463,6 +526,70 @@ export default function UserManagementPage() {
             <Button onClick={() => void handleAdd()} disabled={addBusy || !newName.trim() || !newEmail.trim()}>
               {addBusy && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
               Add Operator
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Operator Dialog */}
+      <Dialog open={editTarget !== null} onOpenChange={(o) => { if (!o) setEditTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              Edit Operator
+            </DialogTitle>
+            <DialogDescription>
+              Update the operator's name, email, or department.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-op-name">Operator Name</Label>
+              <Input
+                id="edit-op-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Jane Doe"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-op-email">Email Address</Label>
+              <Input
+                id="edit-op-email"
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                placeholder="jane.doe@lgcgroup.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-op-dept">Department</Label>
+              <select
+                id="edit-op-dept"
+                value={editDept}
+                onChange={(e) => setEditDept(e.target.value as Department)}
+                className="border rounded-md h-10 px-2 w-full bg-transparent"
+              >
+                {DEPARTMENTS.map((d) => (
+                  <option key={d} value={d}>
+                    {d.charAt(0).toUpperCase() + d.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {editError && (
+              <p className="text-sm text-status-error font-medium">{editError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditTarget(null)} disabled={editBusy}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleEditSave()} disabled={editBusy || !editName.trim() || !editEmail.trim()}>
+              {editBusy && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>
