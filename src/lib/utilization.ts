@@ -159,7 +159,8 @@ export function calculateUtilization(
   const hoursPerBusinessDay =
     totalBusinessDays > 0 ? settings.totalMonthlyHours / totalBusinessDays : 0;
 
-  const targetHoursElapsed = hoursPerBusinessDay * businessDaysElapsed;
+  const targetHoursElapsed =
+    hoursPerBusinessDay * businessDaysElapsed * (settings.targetUtilizationPercent / 100);
 
   const currentHours = currentSeconds / 3600;
 
