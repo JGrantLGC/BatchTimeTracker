@@ -7,6 +7,7 @@ import {
   Trash2,
   ShieldCheck,
   Shield,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,7 @@ import { reportDbError } from "@/lib/safe-error";
 interface OperatorRecord {
   id: string;
   name: string;
+  email: string | null;
   department: string;
   is_admin: boolean;
 }
@@ -47,12 +49,19 @@ export default function UserManagementPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
   const [newDept, setNewDept] = useState<Department>("filling");
   const [addBusy, setAddBusy] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<OperatorRecord | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+
+  // Password prompt for creating an auth account when granting admin
+  const [pwTarget, setPwTarget] = useState<OperatorRecord | null>(null);
+  const [pwValue, setPwValue] = useState("");
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
 
   const currentUserId = session?.user?.id;
 
@@ -64,7 +73,7 @@ export default function UserManagementPage() {
     }
     const { data, error } = await sb
       .from("operators")
-      .select("id, name, department, is_admin")
+      .select("id, name, email, department, is_admin")
       .order("name", { ascending: true });
     if (error) {
       setMessage("Unable to load operators.");
@@ -96,6 +105,23 @@ export default function UserManagementPage() {
     );
   }
 
+  async function createAuthAccount(email: string, password: string, displayName: string): Promise<boolean> {
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-signup`;
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ email, password, display_name: displayName }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error ?? "Unable to create the account.");
+    }
+    return true;
+  }
+
   async function toggleAdmin(op: OperatorRecord) {
     setMessage(null);
     try {
@@ -107,26 +133,79 @@ export default function UserManagementPage() {
         );
         setMessage(`Removed administrator access from ${op.name}.`);
       } else {
-        await grantAdminByEmail(op.name);
-        setOperators((prev) =>
-          prev.map((o) => (o.id === op.id ? { ...o, is_admin: true } : o)),
-        );
-        setMessage(`Granted administrator access to ${op.name}.`);
+        const email = op.email?.trim();
+        if (!email) {
+          setMessage(
+            `${op.name} has no email address. Add one before granting admin access.`,
+          );
+          return;
+        }
+        try {
+          await grantAdminByEmail(email);
+          setOperators((prev) =>
+            prev.map((o) => (o.id === op.id ? { ...o, is_admin: true } : o)),
+          );
+          setMessage(`Granted administrator access to ${op.name}.`);
+        } catch {
+          // Account doesn't exist yet — prompt for password to create it
+          setPwTarget(op);
+          setPwValue("");
+          setPwError(null);
+        }
       }
     } catch {
       setMessage(
         op.is_admin
           ? `Could not remove administrator access from ${op.name}.`
-          : `Could not grant administrator access to ${op.name}. Make sure they have signed up first.`,
+          : `Could not grant administrator access to ${op.name}.`,
       );
+    }
+  }
+
+  async function handlePwConfirm() {
+    if (!pwTarget) return;
+    setPwError(null);
+    const email = pwTarget.email?.trim();
+    if (!email) {
+      setPwError("This operator has no email address.");
+      return;
+    }
+    if (
+      pwValue.length < 8 ||
+      !/[A-Za-z]/.test(pwValue) ||
+      !/[0-9]/.test(pwValue) ||
+      !/[^A-Za-z0-9]/.test(pwValue)
+    ) {
+      setPwError("Use at least 8 characters with a letter, a number, and a special character.");
+      return;
+    }
+    setPwBusy(true);
+    try {
+      await createAuthAccount(email, pwValue, pwTarget.name);
+      await grantAdminByEmail(email);
+      setOperators((prev) =>
+        prev.map((o) => (o.id === pwTarget.id ? { ...o, is_admin: true } : o)),
+      );
+      setMessage(`Created an account for ${pwTarget.name} and granted administrator access.`);
+      setPwTarget(null);
+      setPwValue("");
+    } catch (cause: unknown) {
+      setPwError(cause instanceof Error ? cause.message : "Unable to create the account.");
+    } finally {
+      setPwBusy(false);
     }
   }
 
   async function handleAdd() {
     setAddError(null);
     const trimmed = newName.trim();
+    const trimmedEmail = newEmail.trim().toLowerCase();
     if (!trimmed) {
       setAddError("Enter an operator name.");
+      return;
+    }
+    if (!trimmedEmail || !trimmedEmail.includes("@")) {
+      setAddError("Enter a valid email address.");
       return;
     }
     const sb = getSupabaseOrNull();
@@ -137,8 +216,8 @@ export default function UserManagementPage() {
     setAddBusy(true);
     const { data, error } = await sb
       .from("operators")
-      .insert({ name: trimmed, department: newDept })
-      .select("id, name, department, is_admin")
+      .insert({ name: trimmed, email: trimmedEmail, department: newDept })
+      .select("id, name, email, department, is_admin")
       .single();
     if (error) {
       setAddError(reportDbError("Failed to add operator", error));
@@ -151,6 +230,7 @@ export default function UserManagementPage() {
       ),
     );
     setNewName("");
+    setNewEmail("");
     setNewDept("filling");
     setAddOpen(false);
     setMessage(`Added operator ${trimmed}.`);
@@ -238,6 +318,7 @@ export default function UserManagementPage() {
           <thead className="bg-muted/40">
             <tr>
               <th className="text-left px-4 py-3 font-semibold">Name</th>
+              <th className="text-left px-4 py-3 font-semibold">Email</th>
               <th className="text-left px-4 py-3 font-semibold">Department</th>
               <th className="text-center px-4 py-3 font-semibold">Admin</th>
               <th className="text-right px-4 py-3 font-semibold">Actions</th>
@@ -247,6 +328,9 @@ export default function UserManagementPage() {
             {filtered.map((op) => (
               <tr key={op.id} className="border-t">
                 <td className="px-4 py-3 font-medium">{op.name}</td>
+                <td className="px-4 py-3 text-muted-foreground">
+                  {op.email ?? "—"}
+                </td>
                 <td className="px-4 py-3">
                   <select
                     value={op.department}
@@ -302,7 +386,7 @@ export default function UserManagementPage() {
             {filtered.length === 0 && (
               <tr>
                 <td
-                  colSpan={4}
+                  colSpan={5}
                   className="text-center px-4 py-8 text-muted-foreground"
                 >
                   {search.trim() ? "No matches." : "No operators yet."}
@@ -344,6 +428,16 @@ export default function UserManagementPage() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="new-op-email">Email Address</Label>
+              <Input
+                id="new-op-email"
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="jane.doe@lgcgroup.com"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="new-op-dept">Department</Label>
               <select
                 id="new-op-dept"
@@ -366,7 +460,7 @@ export default function UserManagementPage() {
             <Button variant="outline" onClick={() => setAddOpen(false)} disabled={addBusy}>
               Cancel
             </Button>
-            <Button onClick={() => void handleAdd()} disabled={addBusy || !newName.trim()}>
+            <Button onClick={() => void handleAdd()} disabled={addBusy || !newName.trim() || !newEmail.trim()}>
               {addBusy && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
               Add Operator
             </Button>
@@ -399,6 +493,52 @@ export default function UserManagementPage() {
             >
               {deleteBusy && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
               Delete Operator
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Password Prompt Dialog — create auth account when granting admin */}
+      <Dialog open={pwTarget !== null} onOpenChange={(o) => { if (!o) { setPwTarget(null); setPwValue(""); setPwError(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-brand-lead" />
+              Set Administrator Password
+            </DialogTitle>
+            <DialogDescription>
+              {pwTarget?.name} ({pwTarget?.email}) doesn't have a sign-in account yet.
+              Enter a password to create their account and grant administrator access.
+              They can change it after signing in.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="pw-input">New Password</Label>
+              <Input
+                id="pw-input"
+                type="password"
+                value={pwValue}
+                onChange={(e) => setPwValue(e.target.value)}
+                placeholder="At least 8 characters"
+                autoFocus
+                onKeyDown={(e) => { if (e.key === "Enter") void handlePwConfirm(); }}
+              />
+              <p className="text-xs text-muted-foreground">
+                Must include a letter, a number, and a special character.
+              </p>
+            </div>
+            {pwError && (
+              <p className="text-sm text-status-error font-medium">{pwError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setPwTarget(null); setPwValue(""); setPwError(null); }} disabled={pwBusy}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handlePwConfirm()} disabled={pwBusy || pwValue.length < 8}>
+              {pwBusy && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              Create Account & Grant Access
             </Button>
           </DialogFooter>
         </DialogContent>
