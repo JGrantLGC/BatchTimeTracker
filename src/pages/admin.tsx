@@ -173,6 +173,7 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sessions-all"] });
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
     },
   });
 
@@ -182,6 +183,7 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sessions-all"] });
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
     },
   });
 
