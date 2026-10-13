@@ -25,12 +25,14 @@ import {
 } from "@/components/ui/dialog";
 import {
   DEPARTMENTS,
+  syncAuthorizedOperatorNames,
   syncAuthorizedUsersFromOperators,
   type Department,
 } from "@/lib/app-context";
 import {
   grantAdminByEmail,
-  revokeAdmin,
+  listAdminUsers,
+  revokeAdminByEmail,
   useAdminAccess,
 } from "@/components/system/AdminAccess";
 import { getSupabaseOrNull } from "@/lib/supabase-client";
@@ -93,13 +95,51 @@ export default function UserManagementPage() {
       setLoading(false);
       return;
     }
-    const records = (data ?? []) as OperatorRecord[];
+    let records = (data ?? []) as OperatorRecord[];
+
+    // Administrator access lives in admin_users, not in the operators column.
+    // The column is only a cached copy, so the screen must never trust it on its
+    // own: reading it alone shows a revoked account as still an administrator,
+    // or a granted one as not.
+    try {
+      const admins = await listAdminUsers();
+      const adminEmails = new Set(
+        admins.map((a) => (a.email ?? "").trim().toLowerCase()).filter(Boolean),
+      );
+      records = records.map((o) => ({
+        ...o,
+        is_admin: Boolean(o.email && adminEmails.has(o.email.trim().toLowerCase())),
+      }));
+      await Promise.all(
+        records
+          .filter((o) => o.is_admin !== ((data ?? []) as OperatorRecord[]).find((d) => d.id === o.id)?.is_admin)
+          .map((o) => markOperatorAdminColumn(o.id, o.is_admin)),
+      );
+    } catch {
+      setMessage("Administrator status could not be confirmed and may be out of date.");
+    }
+
     setOperators(records);
-    syncAuthorizedUsersFromOperators(
-      records.filter((o) => o.is_authorized && o.email).map((o) => o.email!),
-    );
+    syncAuthorizedOperators(records);
     setLoading(false);
-    setMessage(null);
+  }
+
+  function syncAuthorizedOperators(records: OperatorRecord[]) {
+    const authorized = records.filter((o) => o.is_authorized);
+    syncAuthorizedUsersFromOperators(
+      authorized.filter((o) => o.email).map((o) => o.email!),
+    );
+    syncAuthorizedOperatorNames(authorized.map((o) => o.name));
+  }
+
+  /** Keeps the cached operators.is_admin column in step with admin_users. */
+  async function markOperatorAdminColumn(id: string, isAdmin: boolean) {
+    const sb = getSupabaseOrNull();
+    if (!sb) return;
+    await sb
+      .from("operators")
+      .update({ is_admin: isAdmin, updated_at: new Date().toISOString() })
+      .eq("id", id);
   }
 
   useEffect(() => {
@@ -154,9 +194,7 @@ export default function UserManagementPage() {
       const updated = prev.map((o) =>
         o.id === op.id ? { ...o, is_authorized: !op.is_authorized } : o,
       );
-      syncAuthorizedUsersFromOperators(
-        updated.filter((o) => o.is_authorized && o.email).map((o) => o.email!),
-      );
+      syncAuthorizedOperators(updated);
       return updated;
     });
   }
@@ -165,7 +203,15 @@ export default function UserManagementPage() {
     setMessage(null);
     try {
       if (op.is_admin) {
-        await revokeAdmin(op.id);
+        const revokeEmail = op.email?.trim();
+        if (!revokeEmail) {
+          setMessage(
+            `${op.name} has no email address, so their administrator access cannot be matched. Add their email first.`,
+          );
+          return;
+        }
+        await revokeAdminByEmail(revokeEmail);
+        await markOperatorAdminColumn(op.id, false);
         await refreshAdminStatus();
         setOperators((prev) =>
           prev.map((o) => (o.id === op.id ? { ...o, is_admin: false } : o)),
@@ -184,6 +230,7 @@ export default function UserManagementPage() {
           setOperators((prev) =>
             prev.map((o) => (o.id === op.id ? { ...o, is_admin: true } : o)),
           );
+          await markOperatorAdminColumn(op.id, true);
           setMessage(`Granted administrator access to ${op.name}.`);
         } catch {
           // Account doesn't exist yet — prompt for password to create it
@@ -225,6 +272,7 @@ export default function UserManagementPage() {
       setOperators((prev) =>
         prev.map((o) => (o.id === pwTarget.id ? { ...o, is_admin: true } : o)),
       );
+      await markOperatorAdminColumn(pwTarget.id, true);
       setMessage(`Created an account for ${pwTarget.name} and granted administrator access.`);
       setPwTarget(null);
       setPwValue("");
@@ -328,11 +376,25 @@ export default function UserManagementPage() {
     if (!sb) return;
     setDeleteBusy(true);
     if (deleteTarget.is_admin) {
+      const revokeEmail = deleteTarget.email?.trim();
+      if (!revokeEmail) {
+        setMessage(
+          `${deleteTarget.name} still holds administrator access and has no email address to match it to. Add their email, remove their administrator access, then delete them.`,
+        );
+        setDeleteBusy(false);
+        return;
+      }
       try {
-        await revokeAdmin(deleteTarget.id);
+        await revokeAdminByEmail(revokeEmail);
         await refreshAdminStatus();
       } catch {
-        // Non-fatal — proceed to delete the operator row
+        // Deleting the operator row would leave the administrator grant in place
+        // with no screen able to remove it, so stop here instead.
+        setMessage(
+          `Could not remove administrator access from ${deleteTarget.name}, so they were not deleted.`,
+        );
+        setDeleteBusy(false);
+        return;
       }
     }
     const { error } = await sb

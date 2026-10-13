@@ -211,11 +211,10 @@ export default function AdminPage() {
       await saveSettingsToSupabase(adminEmail);
       setSettingsMessage("Settings saved and synced to the cloud database.");
     } catch (e: unknown) {
-      setSettingsMessage(
-        e instanceof Error
-          ? `Settings saved locally, but cloud sync failed: ${e.message}`
-          : "Settings saved locally, but cloud sync failed.",
-      );
+      // The provider's own message carries table, column and policy detail, so
+      // it is logged rather than shown.
+      console.error("Settings cloud sync failed:", e);
+      setSettingsMessage("Settings saved locally, but cloud sync failed. Please try again.");
     }
   }
   function exportCSV(name: string, rows: object[]) {
@@ -229,8 +228,13 @@ export default function AdminPage() {
           .map((k) => {
             const v = (r as Record<string, unknown>)[k];
             if (v == null) return "";
-            const s = String(v).replace(/"/g, '""');
-            return /[",\n]/.test(s) ? `"${s}"` : s;
+            // Session rows can be written through the public data interface, so
+            // a value may begin with a character a spreadsheet treats as the
+            // start of a formula. Prefix it so the cell is read as text.
+            const raw = String(v);
+            const neutralised = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+            const s = neutralised.replace(/"/g, '""');
+            return /[",\n\r]/.test(s) ? `"${s}"` : s;
           })
           .join(","),
       ),

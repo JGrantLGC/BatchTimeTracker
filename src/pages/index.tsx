@@ -35,6 +35,7 @@ import { SessionEditDialog, type EditMode } from "@/components/operator/SessionE
 import {
   getBarcodeDelimiter,
   getCurrentOperator,
+  isAuthorizedOperator,
   isAuthorizedUser,
 } from "@/lib/app-context";
 import { parseBarcode } from "@/lib/barcode";
@@ -74,6 +75,11 @@ export default function OperatorPage() {
   const scannerInputRef = useRef<HTMLInputElement>(null);
   const scannerTimingRef = useRef<{ lastTime: number; lastLength: number; isScanning: boolean }>({ lastTime: 0, lastLength: 0, isScanning: false });
   const operator = getCurrentOperator();
+  // Operator sign-in carries no email, so the authorized check must also match
+  // on the operator name published by User Management. Browser-side convenience
+  // only: the database cannot identify an unauthenticated operator.
+  const operatorIsAuthorized =
+    isAuthorizedUser(operator.email) || isAuthorizedOperator(operator.name);
   // Fetch derived job for the resolved JobKey
   const jobQuery = useQuery({
     queryKey: ["job", resolved?.jobKey],
@@ -137,7 +143,7 @@ export default function OperatorPage() {
     return null;
   }, [job?.JobStatus, sessions, operator.email]);
   const canManageForeignRunning =
-    !runningOtherOperator || isAuthorizedUser(operator.email);
+    !runningOtherOperator || operatorIsAuthorized;
   const displayedSeconds = useMemo(() => {
     if (!job) return 0;
     if (job.JobStatus === "Running" && job.CurrentStartTime) {
@@ -211,7 +217,7 @@ export default function OperatorPage() {
         openSession &&
         openSession.OperatorEmail &&
         openSession.OperatorEmail.toLowerCase() !== operator.email.toLowerCase() &&
-        !isAuthorizedUser(operator.email)
+        !operatorIsAuthorized
       ) {
         throw new Error(
           `This JobKey is Running under another operator (${openSession.OperatorName ?? openSession.OperatorEmail}).`,
@@ -254,7 +260,7 @@ export default function OperatorPage() {
         throw new Error("Job is not Running.");
       if (
         runningOtherOperator &&
-        !isAuthorizedUser(operator.email)
+        !operatorIsAuthorized
       ) {
         throw new Error(
           "You are not authorized to Stop another operator's running job.",
@@ -300,7 +306,7 @@ export default function OperatorPage() {
       if (
         job.JobStatus === "Running" &&
         runningOtherOperator &&
-        !isAuthorizedUser(operator.email)
+        !operatorIsAuthorized
       ) {
         throw new Error(
           "You are not authorized to End another operator's running job.",
@@ -395,7 +401,7 @@ export default function OperatorPage() {
     !!resolved &&
     resolved.materialActive &&
     (!job || (job.JobStatus !== "Running" && job.JobStatus !== "Ended")) &&
-    (!runningOtherOperator || isAuthorizedUser(operator.email)) &&
+    (!runningOtherOperator || operatorIsAuthorized) &&
     !busy;
   const canStop =
     !!job &&
@@ -407,7 +413,7 @@ export default function OperatorPage() {
     job.JobStatus !== "Ended" &&
     (job.JobStatus !== "Running" ||
       !runningOtherOperator ||
-      isAuthorizedUser(operator.email)) &&
+      operatorIsAuthorized) &&
     !busy;
   const currentStatus: string = job?.JobStatus ?? "New";
   // Status band styling for the hero time panel
@@ -576,7 +582,7 @@ export default function OperatorPage() {
           <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground">
             <UserCircle2 className="h-4 w-4" />
             <span>Signed in: <span className="font-semibold text-foreground">{operator.name}</span></span>
-            {isAuthorizedUser(operator.email) && (
+            {operatorIsAuthorized && (
               <span className="ml-2 inline-flex items-center rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
                 Authorized
               </span>

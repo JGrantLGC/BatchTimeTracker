@@ -133,6 +133,20 @@ export async function revokeAdmin(userId: string): Promise<void> {
   if (error) throw new Error(reportDbError("Unable to remove administrator access", error));
 }
 
+/**
+ * Removes an administrator grant by email address.
+ *
+ * The operator directory has no column linking a row to an auth account, so the
+ * operator row id must never be passed to revoke_admin: it is an unrelated
+ * generated key and the delete would silently match nothing. The email is the
+ * only identifier shared between the two, and it is the same one
+ * grant_admin_by_email resolves.
+ */
+export async function revokeAdminByEmail(email: string): Promise<void> {
+  const { error } = await getSupabase().rpc("revoke_admin_by_email", { p_email: email });
+  if (error) throw new Error(reportDbError("Unable to remove administrator access", error));
+}
+
 function AdminLoginScreen({
   setupAvailable,
   onSignedIn,

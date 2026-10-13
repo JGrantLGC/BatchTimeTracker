@@ -6,6 +6,7 @@ import {
   setBarcodeDelimiter,
   getAuthorizedUsers,
   setAuthorizedUsers,
+  syncAuthorizedOperatorNames,
 } from "./app-context";
 import { getDataSourceType, setDataSourceType, type DataSourceType } from "./data-source";
 
@@ -27,6 +28,15 @@ export async function loadSettingsFromSupabase(): Promise<void> {
   if (!isSupabaseConfigured()) return;
   const sb = getSupabaseOrNull();
   if (!sb) return;
+  // Load the authorized operator names first. The operators table and
+  // app_settings are both readable by administrators only, so an operator's
+  // browser can only learn this through the dedicated function, and the read
+  // below returns nothing for them.
+  const { data: nameData } = await sb.rpc("authorized_operator_names");
+  if (Array.isArray(nameData)) {
+    syncAuthorizedOperatorNames(nameData as string[]);
+  }
+
   const { data, error } = await sb
     .from("app_settings")
     .select("barcode_delimiter, authorized_users, data_source")
