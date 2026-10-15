@@ -134,14 +134,18 @@ export default function OperatorPage() {
     if (job?.JobStatus !== "Running") return null;
     const openSession = sessions.find((s) => s.SessionStatus === "Running");
     if (!openSession) return null;
-    if (
+    const emailDiffers =
       openSession.OperatorEmail &&
-      openSession.OperatorEmail.toLowerCase() !== operator.email.toLowerCase()
-    ) {
+      openSession.OperatorEmail.toLowerCase() !== operator.email.toLowerCase();
+    const nameDiffers =
+      openSession.OperatorName &&
+      openSession.OperatorName.trim().toLowerCase() !==
+        operator.name.trim().toLowerCase();
+    if (emailDiffers || nameDiffers) {
       return openSession;
     }
     return null;
-  }, [job?.JobStatus, sessions, operator.email]);
+  }, [job?.JobStatus, sessions, operator.email, operator.name]);
   const canManageForeignRunning =
     !runningOtherOperator || operatorIsAuthorized;
   const displayedSeconds = useMemo(() => {
@@ -213,15 +217,19 @@ export default function OperatorPage() {
       const openSession = sessionsAll.find(
         (s) => s.JobKey === resolved.jobKey && s.SessionStatus === "Running",
       );
-      if (
-        openSession &&
-        openSession.OperatorEmail &&
-        openSession.OperatorEmail.toLowerCase() !== operator.email.toLowerCase() &&
-        !operatorIsAuthorized
-      ) {
-        throw new Error(
-          `This JobKey is Running under another operator (${openSession.OperatorName ?? openSession.OperatorEmail}).`,
-        );
+      if (openSession && !operatorIsAuthorized) {
+        const emailDiffers =
+          openSession.OperatorEmail &&
+          openSession.OperatorEmail.toLowerCase() !== operator.email.toLowerCase();
+        const nameDiffers =
+          openSession.OperatorName &&
+          openSession.OperatorName.trim().toLowerCase() !==
+            operator.name.trim().toLowerCase();
+        if (emailDiffers || nameDiffers) {
+          throw new Error(
+            `This JobKey is Running under another operator (${openSession.OperatorName ?? openSession.OperatorEmail}).`,
+          );
+        }
       }
       const startTime = nowIso();
       await MaterialBatchSessionService.create({
