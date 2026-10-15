@@ -147,11 +147,12 @@ export default function OperatorPage() {
   const displayedSeconds = useMemo(() => {
     if (!job) return 0;
     const accumulated = job.TotalSeconds ?? 0;
-    if (job.JobStatus === "Running") {
-      return accumulated + (job.LiveElapsedSeconds ?? 0);
+    if (job.JobStatus === "Running" && job.CurrentStartTime) {
+      const live = secondsBetween(job.CurrentStartTime, nowIso());
+      return accumulated + Math.max(0, live);
     }
     return accumulated;
-    // depend on tick so the ticking happens
+    // depend on tick so the live elapsed recomputes every second
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job, tick]);
   function resetInput() {
