@@ -44,11 +44,10 @@ function utilizationColor(
   };
 }
 
-interface DeptSessionData {
+interface DeptJobData {
   department: string;
-  current: number;
-  completed: number;
-  paused: number;
+  currentJobs: number;
+  completedJobs: number;
   totalSeconds: number;
 }
 
@@ -169,40 +168,37 @@ export default function DashboardPage() {
     );
   }, [settingsQuery.data, calendarQuery.data, sessionsQuery.data, year, month, now, tick]);
 
-  const deptData = useMemo<DeptSessionData[]>(() => {
+  const deptData = useMemo<DeptJobData[]>(() => {
     if (!sessionsQuery.data) return [];
     const monthStart = new Date(year, month, 1).toISOString();
     const monthEnd = new Date(year, month + 1, 1).toISOString();
-    const map = new Map<string, DeptSessionData>();
+    const jobs = MaterialBatchJobService.deriveFromSessions(sessionsQuery.data);
+    const map = new Map<string, DeptJobData>();
     for (const dept of DEPARTMENTS) {
-      map.set(dept, { department: dept, current: 0, completed: 0, paused: 0, totalSeconds: 0 });
+      map.set(dept, { department: dept, currentJobs: 0, completedJobs: 0, totalSeconds: 0 });
     }
     map.set("Unassigned", {
       department: "Unassigned",
-      current: 0,
-      completed: 0,
-      paused: 0,
+      currentJobs: 0,
+      completedJobs: 0,
       totalSeconds: 0,
     });
-    for (const s of sessionsQuery.data) {
-      const st = new Date(s.StartTime).toISOString();
-      if (st < monthStart || st >= monthEnd) continue;
-      const deptKey = s.Department ?? "Unassigned";
+    for (const j of jobs) {
+      const created = j.Created ? new Date(j.Created).toISOString() : undefined;
+      if (!created || created < monthStart || created >= monthEnd) continue;
+      const deptKey = j.Department ?? "Unassigned";
       const entry = map.get(deptKey);
       if (!entry) continue;
-      if (s.SessionStatus === "Running") {
-        entry.current++;
-        entry.totalSeconds += liveDurationSeconds(s.StartTime);
-      } else if (s.SessionStatus === "Paused") {
-        entry.current++;
-        entry.totalSeconds += s.DurationSeconds ?? 0;
-      } else if (s.SessionStatus === "ClosedByEnd") {
-        entry.completed++;
-        entry.totalSeconds += s.DurationSeconds ?? 0;
+      if (j.JobStatus === "Running" || j.JobStatus === "Stopped") {
+        entry.currentJobs++;
+      } else if (j.JobStatus === "Ended") {
+        entry.completedJobs++;
       }
+      const jobTotal = (j.TotalSeconds ?? 0) + (j.LiveElapsedSeconds ?? 0);
+      entry.totalSeconds += jobTotal;
     }
     return Array.from(map.values()).filter(
-      (d) => d.current > 0 || d.completed > 0 || d.paused > 0,
+      (d) => d.currentJobs > 0 || d.completedJobs > 0,
     );
   }, [sessionsQuery.data, year, month, tick]);
 
@@ -439,15 +435,15 @@ export default function DashboardPage() {
           {/* Department totals */}
           <section>
             <h2 className="text-lg font-bold tracking-tight mb-1 text-neutral-100">
-              Sessions by Department — {getMonthName(month)} {year}
+              Jobs by Department — {getMonthName(month)} {year}
             </h2>
             <p className="text-sm text-neutral-400 mb-4">
-              Current (running) and completed sessions for each department this month.
+              Current (running and stopped) and completed (ended) jobs for each department this month.
             </p>
 
             {deptData.length === 0 ? (
               <div className="rounded-lg border border-neutral-800 p-8 text-center text-sm text-neutral-400">
-                No sessions recorded this month yet.
+                No jobs recorded this month yet.
               </div>
             ) : (
               <div className="rounded-lg border border-neutral-800 overflow-hidden">
@@ -456,10 +452,10 @@ export default function DashboardPage() {
                     <tr>
                       <th className="text-left px-4 py-3 font-semibold text-neutral-300">Department</th>
                       <th className="text-center px-4 py-3 font-semibold text-neutral-300">
-                        Current Sessions
+                        Current Jobs
                       </th>
                       <th className="text-center px-4 py-3 font-semibold text-neutral-300">
-                        Completed Sessions
+                        Completed Jobs
                       </th>
                       <th className="text-right px-4 py-3 font-semibold text-neutral-300">
                         Total Time
@@ -473,16 +469,16 @@ export default function DashboardPage() {
                           {d.department}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          {d.current > 0 ? (
+                          {d.currentJobs > 0 ? (
                             <span className="inline-flex items-center rounded-full bg-status-running/15 px-2.5 py-0.5 text-sm font-semibold text-status-running">
-                              {d.current}
+                              {d.currentJobs}
                             </span>
                           ) : (
                             <span className="text-neutral-500">0</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-center font-semibold text-neutral-100">
-                          {d.completed}
+                          {d.completedJobs}
                         </td>
                         <td className="px-4 py-3 text-right font-mono text-neutral-100">
                           {formatHMS(d.totalSeconds)}
