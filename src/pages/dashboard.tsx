@@ -606,7 +606,7 @@ export default function DashboardPage() {
                                 <dt className="text-neutral-500">Duration</dt>
                                 <dd className="text-right font-mono text-neutral-100">
                                   {isRunning
-                                    ? formatHMS(j.TotalSeconds ?? 0)
+                                    ? formatHMS((j.TotalSeconds ?? 0) + (j.LiveElapsedSeconds ?? 0))
                                     : j.TotalSeconds != null
                                       ? formatHMS(j.TotalSeconds)
                                       : "—"}

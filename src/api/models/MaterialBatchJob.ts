@@ -10,6 +10,7 @@ export interface MaterialBatchJob {
   JobStatus: JobStatus;
   CurrentStartTime?: string;
   TotalSeconds?: number;
+  LiveElapsedSeconds?: number;
   EndedTime?: string;
   LastOperatorEmail?: string;
   LastOperatorName?: string;

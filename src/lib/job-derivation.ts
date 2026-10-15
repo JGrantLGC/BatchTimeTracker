@@ -81,17 +81,18 @@ function deriveJobFromSessions(
     status = "Stopped";
   }
 
-  // Total seconds: sum of all session durations.
-  // For Running sessions, use live elapsed time.
+  // TotalSeconds: sum of completed/paused session durations only.
+  // LiveElapsedSeconds: live elapsed of the current Running session (0 if not
+  // running).  Consumers add the two together for a live display total.
   let totalSeconds = 0;
+  let liveElapsedSeconds = 0;
   let currentStartTime: string | undefined;
   for (const s of sorted) {
     if (s.SessionStatus === "Running") {
-      const elapsed = Math.max(
+      liveElapsedSeconds = Math.max(
         0,
         Math.floor((nowMs - new Date(s.StartTime).getTime()) / 1000),
       );
-      totalSeconds += elapsed;
       currentStartTime = s.StartTime;
     } else {
       totalSeconds += s.DurationSeconds ?? 0;
@@ -155,6 +156,7 @@ function deriveJobFromSessions(
     JobStatus: status,
     CurrentStartTime: currentStartTime,
     TotalSeconds: totalSeconds,
+    LiveElapsedSeconds: liveElapsedSeconds,
     EndedTime: endedTime,
     LastOperatorEmail: lastOperatorEmail,
     LastOperatorName: lastOperatorName,

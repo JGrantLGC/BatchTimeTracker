@@ -78,14 +78,14 @@ export default function ReportsPage() {
     const m = new Map<string, number>();
     for (const j of filteredJobs) {
       const key = `${j.MaterialNumber} / ${j.BatchNumber}`;
-      m.set(key, (m.get(key) ?? 0) + (j.TotalSeconds ?? 0));
+      m.set(key, (m.get(key) ?? 0) + (j.TotalSeconds ?? 0) + (j.LiveElapsedSeconds ?? 0));
     }
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
   }, [filteredJobs]);
   const totalByMaterial = useMemo(() => {
     const m = new Map<string, number>();
     for (const j of filteredJobs) {
-      m.set(j.MaterialNumber, (m.get(j.MaterialNumber) ?? 0) + (j.TotalSeconds ?? 0));
+      m.set(j.MaterialNumber, (m.get(j.MaterialNumber) ?? 0) + (j.TotalSeconds ?? 0) + (j.LiveElapsedSeconds ?? 0));
     }
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
   }, [filteredJobs]);

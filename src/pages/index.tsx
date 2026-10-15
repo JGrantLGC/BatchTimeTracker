@@ -146,12 +146,11 @@ export default function OperatorPage() {
     !runningOtherOperator || operatorIsAuthorized;
   const displayedSeconds = useMemo(() => {
     if (!job) return 0;
-    if (job.JobStatus === "Running" && job.CurrentStartTime) {
-      const base = job.TotalSeconds ?? 0;
-      const extra = secondsBetween(job.CurrentStartTime, nowIso());
-      return base + Math.max(0, extra);
+    const accumulated = job.TotalSeconds ?? 0;
+    if (job.JobStatus === "Running") {
+      return accumulated + (job.LiveElapsedSeconds ?? 0);
     }
-    return job.TotalSeconds ?? 0;
+    return accumulated;
     // depend on tick so the ticking happens
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job, tick]);
