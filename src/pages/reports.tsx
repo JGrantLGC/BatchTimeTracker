@@ -106,7 +106,15 @@ export default function ReportsPage() {
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
   }, [filteredSessions]);
   const completedSessions = filteredSessions.filter((s) => s.SessionStatus === "ClosedByEnd").length;
-  const runningJobs = filteredSessions.filter((s) => s.SessionStatus === "Running" || s.SessionStatus === "Paused").length;
+  const runningJobs = useMemo(() => {
+    const activeKeys = new Set<string>();
+    for (const s of filteredSessions) {
+      if (s.SessionStatus === "Running" || s.SessionStatus === "Paused") {
+        activeKeys.add(s.JobKey);
+      }
+    }
+    return activeKeys.size;
+  }, [filteredSessions]);
   const uniqueMaterials = useMemo(() => {
     const m = new Set<string>();
     for (const j of filteredJobs) m.add(j.MaterialNumber);

@@ -14,6 +14,7 @@ export interface MaterialBatchJob {
   LastOperatorEmail?: string;
   LastOperatorName?: string;
   LastActionTime?: string;
+  Department?: string;
   Created?: string;
   Modified?: string;
 }

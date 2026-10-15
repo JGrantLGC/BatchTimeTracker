@@ -134,6 +134,10 @@ function deriveJobFromSessions(
     }
   }
 
+  // Department: use the department from the most recently started session, so
+  // the dashboard groups the job under whoever last worked on it.
+  const department = lastSession?.Department ?? sorted[0]?.Department;
+
   // RawBarcode: reconstruct from material/batch (not stored on session, but
   // job model has it for display).  Use the material + batch from any session.
   const firstSession = sorted[0];
@@ -155,6 +159,7 @@ function deriveJobFromSessions(
     LastOperatorEmail: lastOperatorEmail,
     LastOperatorName: lastOperatorName,
     LastActionTime: lastActionTime,
+    Department: department,
     Created: created,
     Modified: modified,
   };

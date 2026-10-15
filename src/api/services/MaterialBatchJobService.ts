@@ -1,6 +1,7 @@
 import { MaterialBatchSessionService } from "@/api/services/MaterialBatchSessionService";
 import { deriveJobsFromSessions, deriveJobByKey } from "@/lib/job-derivation";
 import type { MaterialBatchJob } from "@/api/models/MaterialBatchJob";
+import type { MaterialBatchSession } from "@/api/models/MaterialBatchSession";
 
 /**
  * Jobs are now derived entirely from session data.  There is no separate
@@ -19,5 +20,9 @@ export const MaterialBatchJobService = {
   async getByJobKey(jobKey: string): Promise<MaterialBatchJob | null> {
     const sessions = await MaterialBatchSessionService.getAll();
     return deriveJobByKey(sessions, jobKey);
+  },
+
+  deriveFromSessions(sessions: MaterialBatchSession[]): MaterialBatchJob[] {
+    return deriveJobsFromSessions(sessions);
   },
 };

@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Loader2, ArrowLeft, ChevronLeft, ChevronRight, GripVertical, RotateCcw, AlertTriangle } from "lucide-react";
 import { MaterialBatchSessionService } from "@/api/services/MaterialBatchSessionService";
-import type { MaterialBatchSession } from "@/api/models/MaterialBatchSession";
+import { MaterialBatchJobService } from "@/api/services/MaterialBatchJobService";
+import type { MaterialBatchJob } from "@/api/models/MaterialBatchJob";
 import {
   fetchUtilizationSettings,
   fetchBusinessDayCalendar,
@@ -51,7 +52,7 @@ interface DeptSessionData {
   totalSeconds: number;
 }
 
-const ENDED_STATUSES = new Set(["ClosedByEnd"]);
+const ACTIVE_JOB_STATUSES = new Set(["Running", "Stopped"]);
 
 const REFRESH_INTERVAL_MS = 30_000;
 
@@ -205,23 +206,24 @@ export default function DashboardPage() {
     );
   }, [sessionsQuery.data, year, month, tick]);
 
-  const activeSessionsByDepartment = useMemo<Array<[string, MaterialBatchSession[]]>>(() => {
+  const activeJobsByDepartment = useMemo<Array<[string, MaterialBatchJob[]]>>(() => {
     if (!sessionsQuery.data) return [];
-    const grouped = new Map<string, MaterialBatchSession[]>();
-    for (const session of sessionsQuery.data) {
-      if (ENDED_STATUSES.has(session.SessionStatus)) continue;
-      const department = session.Department ?? "Unassigned";
-      const sessions = grouped.get(department) ?? [];
-      sessions.push(session);
-      grouped.set(department, sessions);
+    const jobs = MaterialBatchJobService.deriveFromSessions(sessionsQuery.data);
+    const grouped = new Map<string, MaterialBatchJob[]>();
+    for (const job of jobs) {
+      if (!ACTIVE_JOB_STATUSES.has(job.JobStatus)) continue;
+      const department = job.Department ?? "Unassigned";
+      const list = grouped.get(department) ?? [];
+      list.push(job);
+      grouped.set(department, list);
     }
-    for (const sessions of grouped.values()) {
-      sessions.sort((a, b) => {
-        const statusOrder: Record<string, number> = { Running: 0, Paused: 1 };
-        const aOrder = statusOrder[a.SessionStatus] ?? 2;
-        const bOrder = statusOrder[b.SessionStatus] ?? 2;
+    for (const list of grouped.values()) {
+      list.sort((a, b) => {
+        const statusOrder: Record<string, number> = { Running: 0, Stopped: 1 };
+        const aOrder = statusOrder[a.JobStatus] ?? 2;
+        const bOrder = statusOrder[b.JobStatus] ?? 2;
         if (aOrder !== bOrder) return aOrder - bOrder;
-        return new Date(b.StartTime).getTime() - new Date(a.StartTime).getTime();
+        return new Date(b.LastActionTime ?? 0).getTime() - new Date(a.LastActionTime ?? 0).getTime();
       });
     }
     return Array.from(grouped.entries()).sort(([a], [b]) => {
@@ -241,7 +243,7 @@ export default function DashboardPage() {
   }, [sessionsQuery.data, columnOrder]);
 
   function moveDepartment(department: string, direction: -1 | 1): void {
-    const departments = activeSessionsByDepartment.map(([name]) => name);
+    const departments = activeJobsByDepartment.map(([name]) => name);
     const index = departments.indexOf(department);
     const target = index + direction;
     if (index < 0 || target < 0 || target >= departments.length) return;
@@ -259,7 +261,7 @@ export default function DashboardPage() {
     const sourceDepartment = draggedDepartment;
     setDraggedDepartment(null);
     if (!sourceDepartment || sourceDepartment === targetDepartment) return;
-    const departments = activeSessionsByDepartment.map(([name]) => name);
+    const departments = activeJobsByDepartment.map(([name]) => name);
     const sourceIndex = departments.indexOf(sourceDepartment);
     const targetIndex = departments.indexOf(targetDepartment);
     if (sourceIndex < 0 || targetIndex < 0) return;
@@ -502,9 +504,9 @@ export default function DashboardPage() {
               All sessions that are currently running or stopped, grouped by department.
             </p>
 
-            {activeSessionsByDepartment.length === 0 ? (
+            {activeJobsByDepartment.length === 0 ? (
               <div className="rounded-lg border border-neutral-800 p-8 text-center text-sm text-neutral-400">
-                No active or stopped sessions.
+                No active or stopped jobs.
               </div>
             ) : (
               <div className="space-y-3">
@@ -522,7 +524,7 @@ export default function DashboardPage() {
                   </button>
                 </div>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5">
-                {activeSessionsByDepartment.map(([department, departmentSessions], index) => (
+                {activeJobsByDepartment.map(([department, departmentJobs], index) => (
                   <section
                     key={department}
                     onDragOver={(event) => event.preventDefault()}
@@ -555,7 +557,7 @@ export default function DashboardPage() {
                         type="button"
                         title="Move department right"
                         aria-label={`Move ${department} right`}
-                        disabled={index === activeSessionsByDepartment.length - 1}
+                        disabled={index === activeJobsByDepartment.length - 1}
                         onClick={() => moveDepartment(department, 1)}
                         className="rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
                       >
@@ -564,11 +566,14 @@ export default function DashboardPage() {
                     </div>
                     <div className="h-[420px] overflow-y-auto">
                       <div className="divide-y divide-neutral-800">
-                        {departmentSessions.map((s) => {
-                          const isRunning = s.SessionStatus === "Running";
+                        {departmentJobs.map((j) => {
+                          const isRunning = j.JobStatus === "Running";
+                          const sessionCount = sessionsQuery.data?.filter(
+                            (s) => s.JobKey === j.JobKey,
+                          ).length ?? 0;
                           return (
                             <article
-                              key={s.ID}
+                              key={j.ID}
                               className={`space-y-3 p-4 ${
                                 isRunning ? "bg-status-running/10" : "bg-sky-500/10"
                               }`}
@@ -581,27 +586,29 @@ export default function DashboardPage() {
                                       : "border-sky-400/40 bg-sky-400/20 text-sky-400"
                                   }`}
                                 >
-                                  {s.SessionStatus}
+                                  {j.JobStatus}
                                 </span>
                               </div>
                               <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
                                 <dt className="text-neutral-500">Operator</dt>
-                                <dd className="truncate text-right text-neutral-200">{s.OperatorName ?? "—"}</dd>
+                                <dd className="truncate text-right text-neutral-200">{j.LastOperatorName ?? "—"}</dd>
                                 <dt className="text-neutral-500">Material</dt>
                                 <dd className="min-w-0 text-right text-neutral-200">
-                                  <div className="truncate font-mono">{s.MaterialNumber}</div>
-                                  {s.MaterialDescription && (
-                                    <div className="truncate text-xs text-neutral-500">{s.MaterialDescription}</div>
+                                  <div className="truncate font-mono">{j.MaterialNumber}</div>
+                                  {j.MaterialDescription && (
+                                    <div className="truncate text-xs text-neutral-500">{j.MaterialDescription}</div>
                                   )}
                                 </dd>
                                 <dt className="text-neutral-500">Batch</dt>
-                                <dd className="truncate text-right font-mono text-neutral-200">{s.BatchNumber}</dd>
+                                <dd className="truncate text-right font-mono text-neutral-200">{j.BatchNumber}</dd>
+                                <dt className="text-neutral-500">Sessions</dt>
+                                <dd className="text-right font-mono text-neutral-300">{sessionCount}</dd>
                                 <dt className="text-neutral-500">Duration</dt>
                                 <dd className="text-right font-mono text-neutral-100">
                                   {isRunning
-                                    ? formatHMS(liveDurationSeconds(s.StartTime))
-                                    : s.DurationSeconds != null
-                                      ? formatHMS(s.DurationSeconds)
+                                    ? formatHMS(j.TotalSeconds ?? 0)
+                                    : j.TotalSeconds != null
+                                      ? formatHMS(j.TotalSeconds)
                                       : "—"}
                                 </dd>
                               </dl>
