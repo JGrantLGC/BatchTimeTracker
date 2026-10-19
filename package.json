@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "NODE_OPTIONS='--disable-warning=ExperimentalWarning --disable-warning=DEP0162' vite",
+    "build": "tsc -b && NODE_OPTIONS='--disable-warning=ExperimentalWarning --disable-warning=DEP0162' vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
